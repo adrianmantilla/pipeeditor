@@ -607,6 +607,40 @@ def hornear(nodos_):
     return hechos
 
 
+def guardar_copia_horneada(ruta):
+    """Guarda en ``ruta`` una copia de la escena con todo horneado, sin tocar la escena abierta.
+
+    La copia se abre en cualquier Maya, tenga o no PipeEditor (por ejemplo, en
+    una granja de render). Se hornea, se exporta y se deshace el horneado.
+    Devuelve cuántos cables y tuberías se hornearon en la copia.
+    """
+    import os
+    vivos = nodos()
+    tipo = "mayaBinary" if ruta.lower().endswith(".mb") else "mayaAscii"
+    carpeta = os.path.dirname(ruta)
+    if carpeta and not os.path.isdir(carpeta):
+        os.makedirs(carpeta)
+    if not vivos:
+        cmds.file(ruta, exportAll=True, type=tipo, force=True, preserveReferences=True)
+        return 0
+    deshacer = cmds.undoInfo(query=True, state=True)
+    if not deshacer:
+        cmds.undoInfo(state=True)
+    try:
+        with Bloque("Copia horneada"):
+            hornear(vivos)
+        try:
+            cmds.file(ruta, exportAll=True, type=tipo, force=True, preserveReferences=True)
+        finally:
+            cmds.undo()
+    finally:
+        if not deshacer:
+            cmds.undoInfo(state=False)
+    if len(nodos()) != len(vivos):
+        raise RuntimeError(_texto("copia_no_deshecha"))
+    return len(vivos)
+
+
 def borrar(nodos_):
     with Bloque("Borrar"):
         for n in nodos_:

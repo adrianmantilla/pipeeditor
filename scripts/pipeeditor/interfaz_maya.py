@@ -20,6 +20,7 @@ COMANDOS = {
     "PipeEditorCableSeleccion": ("cmd_cable_seleccion", "entre_seleccionados('cable')"),
     "PipeEditorTuberiaSeleccion": ("cmd_tuberia_seleccion", "entre_seleccionados('tuberia')"),
     "PipeEditorHornear": ("cmd_hornear", "hornear()"),
+    "PipeEditorCopiaHorneada": ("cmd_copia_horneada", "copia_horneada()"),
 }
 
 _estado = {"ventana": None, "servicio": None, "trabajos": [], "avisos": []}
@@ -282,6 +283,28 @@ def hornear():
     refrescar()
 
 
+def copia_horneada(ruta=None):
+    """Guarda una copia de la escena con todo horneado (para render en otro ordenador)."""
+    if ruta is None:
+        actual = cmds.file(query=True, sceneName=True)
+        base, ext = os.path.splitext(actual) if actual else ("", ".ma")
+        propuesta = base + "_horneada" + (ext or ".ma") if base else ""
+        elegida = cmds.fileDialog2(fileMode=0, caption=t("menu_copia_horneada"), startingDirectory=propuesta,
+                                   fileFilter="Maya ASCII (*.ma);;Maya Binary (*.mb)")
+        if not elegida:
+            return None
+        ruta = elegida[0]
+    try:
+        n = escena.guardar_copia_horneada(ruta)
+    except RuntimeError as error:
+        cmds.warning("PipeEditor: {}".format(error))
+        return None
+    om.MGlobal.displayInfo(t("copia_horneada_hecha", n=n, ruta=ruta))
+    servicio().mensaje(t("copia_horneada_hecha", n=n, ruta=os.path.basename(ruta)))
+    refrescar()
+    return ruta
+
+
 def _crear_ordenes():
     for nombre, (clave, llamada) in COMANDOS.items():
         codigo = "import pipeeditor.interfaz_maya as m\nm.{}".format(llamada)
@@ -305,6 +328,7 @@ def _crear_menu():
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_hornear"), command=lambda *_: hornear())
     cmds.menuItem(label=t("menu_hornear_todo"), command=lambda *_: _hornear_todo())
+    cmds.menuItem(label=t("menu_copia_horneada"), command=lambda *_: copia_horneada())
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_acerca", version=pipeeditor.__version__), enable=False)
 

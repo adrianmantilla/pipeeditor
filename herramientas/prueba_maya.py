@@ -306,6 +306,16 @@ def main():
         cuerpo2 = escena.formas_de(escena.nodo_de("cable_01"))[0]
         comprobar(caras(cuerpo2) == caras_antes, "al abrir, el cable se recalcula igual")
 
+        # --- copia horneada para render en otro ordenador ---
+        copia = os.path.join(temporal, "copia_horneada.ma")
+        hechos_copia = interfaz_maya.copia_horneada(copia)
+        with open(copia, encoding="utf-8", errors="ignore") as f:
+            texto_copia = f.read()
+        comprobar(hechos_copia and "pipeEditorNodo" not in texto_copia and "cable_01_cuerpo" in texto_copia,
+                  "copia horneada sin nodos de PipeEditor")
+        comprobar(len(escena.nodos()) == len(n2) and cmds.file(query=True, sceneName=True) == ruta
+                  and caras(cuerpo2) == caras_antes, "la escena abierta sigue igual tras la copia")
+
         # --- hornear ---
         hechos = escena.hornear([escena.nodo_de("cable_01")])
         comprobar(hechos and not cmds.ls("cable_01_nodo"), "hornear quita el nodo")

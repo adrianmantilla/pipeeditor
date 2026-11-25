@@ -199,7 +199,7 @@
   "conector_puesto": "Conector propio puesto en los dos extremos.",
   "horneados": "{n} horneados: ya son mallas normales.",
   "aviso_guardar": "Esta escena tiene {n} cables o tuberías vivos de PipeEditor.",
-  "aviso_guardar_texto": "PipeEditor: la escena tiene {n} cables o tuberías vivos. Para abrirla en un Maya sin PipeEditor, hornéalos antes (menú PipeEditor > Hornear todos los de la escena).",
+  "aviso_guardar_texto": "PipeEditor: la escena tiene {n} cables o tuberías vivos. Para abrirla en un Maya sin PipeEditor (por ejemplo, en una granja de render), guarda una copia horneada (menú PipeEditor > Guardar una copia horneada…) o hornéalos todos.",
   "error": "No se pudo: {texto}",
   "seccion_reposo": "Reposo y naturalidad",
   "campo_arriba": "Eje vertical",
@@ -244,5 +244,9 @@
   "fijado_si": "Forma fijada: el cable ya no se recalcula.",
   "fijado_no": "Cable suelto: vuelve a calcularse.",
   "falta_cable_vivo": "Selecciona antes un cable creado con anclajes (no desde una curva).",
-  "estado_fijados": "{n} con la forma fijada."
+  "estado_fijados": "{n} con la forma fijada.",
+  "menu_copia_horneada": "Guardar una copia horneada…",
+  "cmd_copia_horneada": "PipeEditor: guardar una copia de la escena con todo horneado, para render en otro ordenador",
+  "copia_horneada_hecha": "Copia horneada guardada ({n} cables o tuberías): {ruta}",
+  "copia_no_deshecha": "No se pudo dejar la escena como estaba tras guardar la copia. Usa Editar > Deshacer."
 }
