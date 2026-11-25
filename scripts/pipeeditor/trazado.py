@@ -7,7 +7,7 @@ import math
 
 from pipeeditor import vec
 
-RECORRIDOS = ("z", "l", "libre")
+RECORRIDOS = ("z", "l", "libre", "esquivar")
 
 
 def ortogonal(p, q, modo="z", tolerancia=1e-4):
@@ -86,10 +86,11 @@ class Codo(object):
         self.angulo = angulo
 
 
-def redondear(puntos, radio, pasos=8, solo=None):
+def redondear(puntos, radio, pasos=8, solo=None, radios=None):
     """Cambia cada esquina de la polilínea por un arco de ``radio``.
 
     ``solo``: índices de esquina a redondear (por defecto todas).
+    ``radios``: radio de cada esquina {índice: radio}, para codos concéntricos.
     Si dos codos no caben, el radio se reduce en ese codo.
     Devuelve (puntos, codos).
     """
@@ -117,7 +118,10 @@ def redondear(puntos, radio, pasos=8, solo=None):
             continue
         recorte_max = min(vec.distancia(a, b) * (0.5 if i - 1 > 0 else 1.0),
                           vec.distancia(b, c) * (0.5 if i + 1 < n - 1 else 1.0))
-        r = radio
+        r = radios.get(i, radio) if radios else radio
+        if r <= 0:
+            salida.append(b)
+            continue
         recorte = r * math.tan(giro / 2.0)
         if recorte > recorte_max:
             recorte = recorte_max * 0.999
@@ -302,3 +306,169 @@ def adaptativo(puntos, paso_max, angulo=6.0, paso_min=0.0):
             giro, recorrido = 0.0, 0.0
     salida.append(pts[-1])
     return salida
+
+
+
+# --- recorridos que esquivan obstáculos ---------------------------------------------
+
+def _corta(a, b, caja):
+    """¿El tramo recto (en un eje) de ``a`` a ``b`` entra en la ``caja`` abierta?"""
+    lo, hi = caja
+    for k in range(3):
+        mn, mx = min(a[k], b[k]), max(a[k], b[k])
+        if mx <= lo[k] + 1e-9 or mn >= hi[k] - 1e-9:
+            return False
+    return True
+
+
+def _dentro(p, caja):
+    lo, hi = caja
+    return all(lo[k] < p[k] < hi[k] for k in range(3))
+
+
+def esquivar(p, q, obstaculos, holgura, penalizacion_codo=None, maximo=60):
+    """Recorrido en ángulo recto de ``p`` a ``q`` que no atraviesa ``obstaculos``.
+
+    ``obstaculos``: cajas (mínimo, máximo) de los objetos; se hinchan
+    ``holgura`` (radio de la tubería más el aire que se quiere dejar). Busca
+    con A* sobre una rejilla con las coordenadas de las cajas, y cada codo
+    cuesta ``penalizacion_codo`` de longitud: salen pocos codos, como en una
+    instalación real. Devuelve la polilínea (con ``p`` y ``q``), o None si no
+    hay camino.
+    """
+    import heapq
+    p, q = tuple(p), tuple(q)
+    zona_lo = [min(p[k], q[k]) for k in range(3)]
+    zona_hi = [max(p[k], q[k]) for k in range(3)]
+    cajas = []
+    for lo, hi in obstaculos:
+        lo_h = tuple(lo[k] - holgura for k in range(3))
+        hi_h = tuple(hi[k] + holgura for k in range(3))
+        caja = (lo_h, hi_h)
+        if _dentro(p, caja) or _dentro(q, caja):
+            caja = (tuple(lo), tuple(hi))  # el extremo está pegado a este objeto: sin holgura
+            if _dentro(p, caja) or _dentro(q, caja):
+                continue
+        cajas.append(caja)
+    for lo, hi in cajas:
+        for k in range(3):
+            zona_lo[k] = min(zona_lo[k], lo[k])
+            zona_hi[k] = max(zona_hi[k], hi[k])
+    cajas = cajas[:maximo]
+    if not any(_corta(a, b, c) for c in cajas for a, b in zip([p] + ortogonal(p, q, "z"),
+                                                               ortogonal(p, q, "z") + [q])):
+        return None  # el recorrido normal ya está libre
+    ejes = []
+    margen = holgura * 2.0
+    for k in range(3):
+        valores = {p[k], q[k]}
+        for lo, hi in cajas:
+            valores.add(lo[k])
+            valores.add(hi[k])
+            valores.add(lo[k] - margen)
+            valores.add(hi[k] + margen)
+        ejes.append(sorted(valores))
+    indice = [{v: i for i, v in enumerate(e)} for e in ejes]
+    inicio = tuple(indice[k][p[k]] for k in range(3))
+    meta = tuple(indice[k][q[k]] for k in range(3))
+    escala = vec.distancia(p, q) or 1.0
+    codo = penalizacion_codo if penalizacion_codo is not None else max(holgura * 8.0, escala * 0.05)
+
+    def punto_de(nodo):
+        return tuple(ejes[k][nodo[k]] for k in range(3))
+
+    def libre(a, b):
+        return not any(_corta(a, b, c) for c in cajas)
+
+    def h(nodo):
+        x = punto_de(nodo)
+        return sum(abs(x[k] - q[k]) for k in range(3))
+
+    abiertos = [(h(inicio), 0.0, inicio, -1)]
+    coste = {(inicio, -1): 0.0}
+    padre = {}
+    vistos = 0
+    while abiertos:
+        _f, g, nodo, direccion = heapq.heappop(abiertos)
+        if nodo == meta:
+            camino = [nodo]
+            estado = (nodo, direccion)
+            while estado in padre:
+                estado = padre[estado]
+                camino.append(estado[0])
+            return limpiar([punto_de(n) for n in reversed(camino)])
+        vistos += 1
+        if vistos > 200000:
+            return None
+        if g > coste.get((nodo, direccion), float("inf")):
+            continue
+        a = punto_de(nodo)
+        for eje in range(3):
+            for paso in (-1, 1):
+                j = nodo[eje] + paso
+                if j < 0 or j >= len(ejes[eje]):
+                    continue
+                vecino = list(nodo)
+                vecino[eje] = j
+                vecino = tuple(vecino)
+                b = punto_de(vecino)
+                if not libre(a, b):
+                    continue
+                nueva_dir = eje * 2 + (paso > 0)
+                if direccion >= 0 and nueva_dir // 2 == direccion // 2 and nueva_dir != direccion:
+                    continue  # no dar media vuelta
+                g2 = g + abs(b[eje] - a[eje]) + (codo if direccion >= 0 and nueva_dir != direccion else 0.0)
+                clave = (vecino, nueva_dir)
+                if g2 < coste.get(clave, float("inf")):
+                    coste[clave] = g2
+                    padre[clave] = (nodo, direccion)
+                    heapq.heappush(abiertos, (g2 + h(vecino), g2, vecino, nueva_dir))
+    return None
+
+
+# --- varias tuberías en paralelo (rack) ----------------------------------------------
+
+def _laterales(puntos, arriba=(0.0, 1.0, 0.0)):
+    """Dirección lateral de cada tramo: horizontal y perpendicular al tramo.
+
+    Los tramos verticales heredan la del tramo horizontal más cercano, así las
+    tuberías de un rack siguen en fila al subir o bajar.
+    """
+    laterales = []
+    for a, b in zip(puntos, puntos[1:]):
+        d = vec.unitario(vec.resta(b, a))
+        l = vec.cruz(arriba, d)
+        laterales.append(vec.unitario(l) if vec.largo(l) > 1e-6 else None)
+    ultimo = next((l for l in laterales if l is not None), (1.0, 0.0, 0.0))
+    for i, l in enumerate(laterales):
+        if l is None:
+            laterales[i] = ultimo
+        else:
+            ultimo = l
+    return laterales
+
+
+def paralela(puntos, desplazamiento, radio_base, arriba=(0.0, 1.0, 0.0)):
+    """Polilínea en ángulo recto desplazada ``desplazamiento`` a un lado, y el radio de cada esquina.
+
+    Las esquinas se calculan para que los codos de todas las tuberías del rack
+    sean concéntricos (mismo centro): el de fuera es más abierto.
+    Devuelve (puntos, {índice de esquina: radio}).
+    """
+    if len(puntos) < 2:
+        return list(puntos), {}
+    if abs(desplazamiento) < 1e-12:
+        return list(puntos), {i: radio_base for i in range(1, len(puntos) - 1)}
+    laterales = _laterales(puntos, arriba)
+    offs = [vec.escala(l, desplazamiento) for l in laterales]
+    salida = [vec.suma(puntos[0], offs[0])]
+    radios = {}
+    for i in range(1, len(puntos) - 1):
+        d1 = vec.unitario(vec.resta(puntos[i], puntos[i - 1]))
+        d2 = vec.unitario(vec.resta(puntos[i + 1], puntos[i]))
+        o1, o2 = offs[i - 1], offs[i]
+        esquina = vec.suma(vec.suma(puntos[i], o1), vec.escala(d1, vec.punto(o2, d1)))
+        salida.append(esquina)
+        radios[i] = radio_base - vec.punto(o1, d2)
+    salida.append(vec.suma(puntos[-1], offs[-1]))
+    return salida, radios

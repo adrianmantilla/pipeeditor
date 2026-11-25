@@ -314,6 +314,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         activo("torsion", haz)
         activo("separacion_bridas_haz", haz)
         activo("pared", self.valor("extremos") == "abiertos")
+        activo("separacion_tubos", self.valor("tubos") > 1)
         auto = self.valor("soportes_auto")
         activo("separacion_soportes", not auto)
         activo("alcance_soportes", auto or self.valor("separacion_soportes") > 0)

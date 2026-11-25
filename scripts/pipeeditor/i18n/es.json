@@ -84,7 +84,7 @@
   "campo_altura_suelo": "Altura del suelo",
   "campo_altura_suelo_ayuda": "Altura del plano del suelo (normalmente 0).",
   "campo_recorrido": "Recorrido",
-  "campo_recorrido_ayuda": "Cómo va de un punto a otro: en Z (mitad, giro, mitad), en L (primero el eje más largo) o en línea recta.",
+  "campo_recorrido_ayuda": "Cómo va de un punto a otro: en Z (mitad, giro, mitad), en L (primero el eje más largo), en línea recta o esquivando los objetos de apoyo con los mínimos codos.",
   "campo_radio_codo": "Radio del codo",
   "campo_radio_codo_ayuda": "Radio de los codos, en diámetros de la tubería. 0 deja esquinas en ángulo.",
   "campo_codo": "Codos",
@@ -229,5 +229,10 @@
   "opcion_norma_acero": "Tubo de acero (DN)",
   "opcion_norma_cobre": "Tubo de cobre",
   "campo_soportes_auto": "Separación según el diámetro",
-  "campo_soportes_auto_ayuda": "Pone los soportes a la distancia que se usa en montaje: unos 1,8 m en tubos finos y hasta 5 m en tubos gruesos."
+  "campo_soportes_auto_ayuda": "Pone los soportes a la distancia que se usa en montaje: unos 1,8 m en tubos finos y hasta 5 m en tubos gruesos.",
+  "opcion_recorrido_esquivar": "Esquivando objetos",
+  "campo_tubos": "Tuberías en paralelo",
+  "campo_tubos_ayuda": "Varias tuberías juntas, como en un rack: van en fila, con la misma separación y con los codos concéntricos.",
+  "campo_separacion_tubos": "Separación entre tuberías",
+  "campo_separacion_tubos_ayuda": "Distancia entre los ejes de dos tuberías vecinas. 0 = automática (un poco más que su grosor)."
 }

@@ -10,7 +10,7 @@ import math
 
 import maya.api.OpenMaya as om
 
-from pipeeditor import construir, piezas, perfiles
+from pipeeditor import construir, piezas, perfiles, trazado
 from pipeeditor import malla as ml
 
 NOMBRE = "pipeEditorNodo"
@@ -25,7 +25,7 @@ ENUMS = {
     "conectorFin": piezas.CONECTORES,
     "pieza": piezas.PIEZAS_CABLE,
     "perfilTuberia": perfiles.PERFILES_TUBERIA,
-    "recorrido": ("z", "l", "libre"),
+    "recorrido": trazado.RECORRIDOS,
     "codo": construir.CODOS,
     "extremos": piezas.EXTREMOS_TUBERIA,
     "arriba": construir.EJES,
@@ -50,6 +50,8 @@ NUMEROS = [
     ("torsion", "torsion", "d", -10.0, 10.0),
     ("separacionBridasHaz", "separacion_bridas_haz", "d", 0.0, 500.0),
     ("radioCodo", "radio_codo", "d", 0.0, 10.0),
+    ("tubos", "tubos", "i", 1, 12),
+    ("separacionTubos", "separacion_tubos", "d", 0.0, 200.0),
     ("separacionBridas", "separacion_bridas", "d", 0.0, 1000.0),
     ("pared", "pared", "d", 0.0, 10.0),
     ("separacionSoportes", "separacion_soportes", "d", 0.0, 1000.0),
@@ -239,9 +241,10 @@ class PipeEditorNodo(om.MPxNode):
         eje = 2 if ajustes["arriba"] == "z" else 1
         bajar = _bajar(apoyos, eje) if apoyos else None
         cercano = _cercano(apoyos) if apoyos else None
-        empujar = _empujar(apoyos) if apoyos else None
+        empujar = _empujar(apoyos) if apoyos and ajustes["tipo"] == "cable" else None
+        obstaculos = _cajas(apoyos) if apoyos and ajustes["tipo"] == "tuberia" else []
         return construir.construir(ajustes, anclajes, ruta=ruta, ruta_lineal=lineal, bajar=bajar,
-                                   cercano=cercano, malla_propia=propio, empujar=empujar)
+                                   cercano=cercano, malla_propia=propio, empujar=empujar, obstaculos=obstaculos)
 
 
 def _valores_array(arr, leer):
@@ -315,6 +318,20 @@ def _cercano(apoyos):
                 mejor, distancia = ((q.x, q.y, q.z), (n.x, n.y, n.z)), d
         return mejor
     return cercano
+
+
+def _cajas(apoyos):
+    """Caja (mínimo, máximo) de cada malla de apoyo, en coordenadas de escena."""
+    salida = []
+    for fn, _acel in apoyos:
+        try:
+            pts = fn.getPoints(om.MSpace.kWorld)
+        except RuntimeError:
+            pts = fn.getPoints()
+        if len(pts):
+            xs, ys, zs = [p.x for p in pts], [p.y for p in pts], [p.z for p in pts]
+            salida.append(((min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))))
+    return salida
 
 
 def _empujar(apoyos):

@@ -1,6 +1,6 @@
 """Campos de la ventana de PipeEditor (sin Qt ni Maya, para poder comprobarlos)."""
 
-from pipeeditor import construir, perfiles, piezas
+from pipeeditor import construir, perfiles, piezas, trazado
 
 # Campos: (clave, control, opciones o (mínimo, máximo, decimales, paso, sufijo), tipos, sección)
 CAMPOS = [
@@ -22,7 +22,9 @@ CAMPOS = [
     ("ondulacion", "porcentaje", (0.0, 100.0, 0, 5, " %"), ("cable",), "reposo"),
     ("variacion", "porcentaje", (0.0, 100.0, 0, 5, " %"), ("cable",), "reposo"),
     ("semilla", "entero", (0, 1000, 0, 1, ""), ("cable",), "reposo"),
-    ("recorrido", "lista", ("z", "l", "libre"), ("tuberia",), "recorrido"),
+    ("recorrido", "lista", trazado.RECORRIDOS, ("tuberia",), "recorrido"),
+    ("tubos", "entero", (1, 12, 0, 1, ""), ("tuberia",), "recorrido"),
+    ("separacion_tubos", "numero", (0.0, 500.0, 1, 1.0, " cm"), ("tuberia",), "recorrido"),
     ("radio_codo", "numero", (0.0, 10.0, 2, 0.25, " ×"), ("tuberia",), "recorrido"),
     ("codo", "lista", construir.CODOS, ("tuberia",), "recorrido"),
     ("conector_inicio", "lista", piezas.CONECTORES, ("cable",), "extremos"),

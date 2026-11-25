@@ -70,6 +70,8 @@ POR_DEFECTO = {
     "perfil_tuberia": "redonda",
     "norma": "libre",            # medidas normalizadas: libre, acero (DN) o cobre
     "recorrido": "z",
+    "tubos": 1,                  # varias tuberías en paralelo (rack)
+    "separacion_tubos": 0.0,     # entre ejes; 0 = automática
     "radio_codo": 1.5,           # en diámetros de la tubería (1,5 = codo de radio largo)
     "codo": "curvado",
     "separacion_bridas": 0.0,
@@ -115,7 +117,7 @@ def ajustes(**cambios):
 
 
 def construir(a, anclajes=(), ruta=None, ruta_lineal=False, bajar=None, cercano=None, malla_propia=None,
-              empujar=None):
+              empujar=None, obstaculos=()):
     """Devuelve un ``Resultado``.
 
     ``anclajes``: lista de ``Anclaje`` (al menos dos), o vacía si hay ``ruta``.
@@ -125,15 +127,18 @@ def construir(a, anclajes=(), ruta=None, ruta_lineal=False, bajar=None, cercano=
     ``cercano(punto, tangente)``: (punto, normal) de la superficie más cercana, o None.
     ``empujar(P, radio)``: saca de los objetos de apoyo los puntos del array
     ``P`` (N×3); devuelve (P corregido, máscara de contacto). Ver ``reposo``.
+    ``obstaculos``: cajas (mínimo, máximo) de los objetos que una tubería con
+    recorrido «esquivar» no debe atravesar.
 
     Con ``arriba = "z"`` todo llega y sale en coordenadas de la escena; por
     dentro se trabaja siempre con Y hacia arriba.
     """
     a = ajustes(**a)
     if a["arriba"] == "z":
-        return _con_z_arriba(a, list(anclajes), ruta, ruta_lineal, bajar, cercano, malla_propia, empujar)
+        return _con_z_arriba(a, list(anclajes), ruta, ruta_lineal, bajar, cercano, malla_propia, empujar,
+                             obstaculos)
     if a["tipo"] == "tuberia":
-        return _tuberia(a, list(anclajes), ruta, ruta_lineal, cercano)
+        return _tuberia(a, list(anclajes), ruta, ruta_lineal, cercano, obstaculos)
     return _cable(a, list(anclajes), ruta, ruta_lineal, bajar, malla_propia, empujar)
 
 
@@ -147,7 +152,7 @@ def _a_escena(p):
     return (p[0], -p[2], p[1])
 
 
-def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, empujar):
+def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, empujar, obstaculos=()):
     b = dict(a, arriba="y")
     anclajes = [Anclaje(_a_interno(x.posicion), _a_interno(x.normal), x.factor, x.longitud, x.desliza)
                 for x in anclajes]
@@ -169,7 +174,11 @@ def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, 
             Q, contacto = empujar(fuera, radio)
             Q = np.asarray(Q, dtype=float)
             return np.stack([Q[:, 0], Q[:, 2], -Q[:, 1]], axis=1), contacto
-    res = construir(b, anclajes, ruta, ruta_lineal, bajar_i, cercano_i, malla_propia, empujar_i)
+    cajas = []
+    for lo, hi in obstaculos:
+        u, v = _a_interno(lo), _a_interno(hi)
+        cajas.append((tuple(min(u[k], v[k]) for k in range(3)), tuple(max(u[k], v[k]) for k in range(3))))
+    res = construir(b, anclajes, ruta, ruta_lineal, bajar_i, cercano_i, malla_propia, empujar_i, cajas)
     res.cuerpo.vertices = [_a_escena(p) for p in res.cuerpo.vertices]
     res.piezas.vertices = [_a_escena(p) for p in res.piezas.vertices]
     res.curva = [_a_escena(p) for p in res.curva]
@@ -395,38 +404,76 @@ def _sobre_suelo(camino, suelo, r):
 
 # --- tuberías -------------------------------------------------------------------------
 
-def _tuberia(a, anclajes, ruta, ruta_lineal, cercano):
+def _tuberia(a, anclajes, ruta, ruta_lineal, cercano, obstaculos=()):
     res = Resultado()
     medida = medida_normalizada(a["norma"], a["grosor"])
     if medida is not None:
         a = dict(a, grosor=medida[0], pared=medida[1] if a["pared"] > 0 else 0.0)
     R = max(a["grosor"], 1e-4) / 2.0
+    R_fuera = R * (1.35 if a["perfil_tuberia"] == "aislada" else 1.0)
     radio_codo = max(0.0, a["radio_codo"]) * 2.0 * R
-    codos = []
+    cantidad = max(1, int(a["tubos"]))
+    separacion = a["separacion_tubos"] if a["separacion_tubos"] > 0 else R_fuera * 2.0 * 1.6
+    desplazamientos = [(k - (cantidad - 1) / 2.0) * separacion for k in range(cantidad)]
+    # Con varias tuberías, el codo de la de dentro mantiene el radio pedido.
+    radio_base = radio_codo + max(abs(d) for d in desplazamientos)
+
+    recorridos = []  # (camino, codos) de cada tubería
     if ruta is not None and len(ruta) >= 2:
-        camino = trazado.limpiar([tuple(p) for p in ruta]) if ruta_lineal else [tuple(p) for p in ruta]
         if ruta_lineal:
-            camino, codos = trazado.redondear(camino, radio_codo, pasos=14)
+            polilinea = trazado.limpiar([tuple(p) for p in ruta])
+            for d in desplazamientos:
+                pts, radios = trazado.paralela(polilinea, d, radio_base if cantidad > 1 else radio_codo)
+                recorridos.append(trazado.redondear(pts, radio_codo, pasos=14, radios=radios))
+        else:
+            base = [tuple(p) for p in ruta]
+            marcos = trazado.marcos(base)
+            for d in desplazamientos:
+                pts = base if not d else [vec.suma(p, vec.escala(m[2], d)) for p, m in zip(base, marcos)]
+                recorridos.append((pts, []))
     elif len(anclajes) >= 2:
         salida = max(0.0, a["salida"])
         primero, ultimo = anclajes[0], anclajes[-1]
         s0 = vec.suma(primero.posicion, vec.escala(primero.normal, salida))
         s1 = vec.suma(ultimo.posicion, vec.escala(ultimo.normal, salida))
         paradas = [s0] + [x.posicion for x in anclajes[1:-1]] + [s1]
-        medio = trazado.recorrido_ortogonal(paradas, a["recorrido"])
+        medio = None
+        if a["recorrido"] == "esquivar" and obstaculos:
+            medio = [paradas[0]]
+            for p, q in zip(paradas, paradas[1:]):
+                tramo = trazado.esquivar(p, q, obstaculos, R_fuera + max(separacion * (cantidad - 1) / 2.0, 0.0)
+                                         + R_fuera)
+                if tramo is None:
+                    tramo = trazado.recorrido_ortogonal([p, q], "z")
+                medio.extend(tramo[1:])
+            medio = trazado.limpiar(medio)
+        if medio is None:
+            modo = a["recorrido"] if a["recorrido"] != "esquivar" else "z"
+            medio = trazado.recorrido_ortogonal(paradas, modo)
         polilinea = ([primero.posicion] if salida > 0 else []) + medio + ([ultimo.posicion] if salida > 0 else [])
         polilinea = trazado.limpiar(polilinea)
-        camino, codos = trazado.redondear(polilinea, radio_codo, pasos=14)
+        for d in desplazamientos:
+            pts, radios = trazado.paralela(polilinea, d, radio_base if cantidad > 1 else radio_codo)
+            recorridos.append(trazado.redondear(pts, radio_codo, pasos=14, radios=radios))
     else:
         return res
-    if len(camino) < 2:
+    recorridos = [(c, k) for c, k in recorridos if len(c) >= 2]
+    if not recorridos:
         return res
-    res.curva = camino
-    res.longitud = vec.longitud_polilinea(camino)
+    for camino, codos in recorridos:
+        _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano)
+    medio = recorridos[len(recorridos) // 2][0]
+    res.curva = medio
+    res.longitud = vec.longitud_polilinea(medio)
     res.longitudes = [res.longitud]
+    return res
+
+
+def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
+    """Cuerpo y piezas de una tubería ya trazada."""
     abierta = a["extremos"] == "abiertos"
-    res.cuerpo = perfiles.cuerpo_tuberia(camino, R, a["perfil_tuberia"], max(a["lados"], 8), a["pared"], abierta)
-    R_fuera = R * (1.35 if a["perfil_tuberia"] == "aislada" else 1.0)
+    res.cuerpo.anadir(perfiles.cuerpo_tuberia(camino, R, a["perfil_tuberia"], max(a["lados"], 8), a["pared"],
+                                              abierta))
 
     s = vec.acumulada(camino)
     curvas = [(s[c.indice_inicio] - R_fuera * 1.6, s[c.indice_fin] + R_fuera * 1.6) for c in codos]
