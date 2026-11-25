@@ -68,7 +68,7 @@ def conector(tipo, r, propia=None):
         return Conector(m, 8.0 * r)
     if tipo == "aislador":
         # Aislador de porcelana sobre su perno; el cable se ata arriba.
-        R = max(4.0 * r, 4.0)
+        R = max(4.0 * r, 6.0)
         m.anadir(ml.metal(ml.cilindro(0.18 * R, 0.0, 0.9 * R, 8)))
         y = 0.9 * R
         for k in range(3):
@@ -148,14 +148,20 @@ def soporte(R, origen, tangente, contacto, normal_superficie):
     ``contacto`` el punto de la pared y ``normal_superficie`` su normal.
     """
     m = ml.Malla()
-    aro = ml.metal(ml.toro(R * 1.12, R * 0.12, 18, 5))
-    m.anadir(aro, vec.marco_desde_eje(origen, tangente))
+    # Tamaños mínimos reales (en cm): en tuberías finas, la abrazadera, la
+    # varilla y la placa no pueden encoger con el diámetro hasta no verse.
+    ancho = max(R * 0.6, 2.0)
+    m.anadir(ml.metal(ml.cilindro(R * 1.06 + 0.15, -ancho / 2.0, ancho / 2.0, 20)),
+             vec.marco_desde_eje(origen, tangente))
     hacia = vec.resta(contacto, origen)
     distancia = vec.largo(hacia)
     if distancia > R * 1.2:
         eje = vec.unitario(hacia)
-        varilla = ml.metal(ml.cilindro(R * 0.14, R * 1.12, distancia, 6))
-        m.anadir(varilla, vec.marco_desde_eje(origen, eje, tangente))
-        placa = ml.metal(ml.cilindro(R * 0.55, 0.0, R * 0.16, 10))
-        m.anadir(placa, vec.marco_desde_eje(contacto, normal_superficie, tangente))
+        grueso = max(R * 0.14, 0.5)
+        m.anadir(ml.metal(ml.cilindro(grueso, R * 1.0, distancia, 8)), vec.marco_desde_eje(origen, eje, tangente))
+        m.anadir(ml.metal(ml.cilindro(grueso * 1.7, R * 1.05, R * 1.05 + grueso * 1.6, 6)),
+                 vec.marco_desde_eje(origen, eje, tangente))  # tuerca de la abrazadera
+        placa = max(R * 0.55, 3.0)
+        m.anadir(ml.metal(ml.cilindro(placa, 0.0, max(R * 0.16, 0.4), 12)),
+                 vec.marco_desde_eje(contacto, normal_superficie, tangente))
     return m

@@ -90,7 +90,7 @@ def construir_escena(cmds, escena):
     # Cuerda de puerto entre los dos postes, con grillete.
     crear(cmds, escena, [((150, 270, 128), (1, 0, 0), postes[0]), ((520, 230, 128), (-1, 0, 0), postes[1])],
           {"tipo": "cable", "perfil_cable": "trenzado", "grosor": 4.0, "holgura": 0.12, "lados": 8,
-           "conector_fin": "grillete", "material_cuerpo": "canamo", "material_piezas": "acero_galvanizado",
+           "conector_inicio": "grillete", "conector_fin": "grillete", "material_cuerpo": "canamo", "material_piezas": "acero_galvanizado",
            "material_metal": "acero_galvanizado"},
           {"rigidez": 0.1})
     # Haz de cables sueltos del poste al suelo.
