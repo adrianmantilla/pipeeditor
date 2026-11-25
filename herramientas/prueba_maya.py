@@ -37,6 +37,12 @@ def caras(forma):
     return cmds.polyEvaluate(forma, face=True) if forma and cmds.objExists(forma) else 0
 
 
+def puntos_curva(forma):
+    import maya.api.OpenMaya as om
+    camino = om.MSelectionList().add(forma).getDagPath(0)
+    return [(p.x, p.y, p.z) for p in om.MFnNurbsCurve(camino).cvPositions(om.MSpace.kWorld)]
+
+
 def caja_y(forma):
     from maya import cmds
     return cmds.exactWorldBoundingBox(forma)
@@ -110,10 +116,11 @@ def main():
         cmds.move(250, 150, 50, mesa)
         cmds.setAttr(n + ".holgura", 1.0)
         escena.poner_apoyos([n], [mesa])
-        puntos = cmds.getAttr(curva + ".cv[*]")
+        puntos = puntos_curva(curva)
         encima = [p[1] for p in puntos if 170 < p[0] < 330]
         comprobar(caras(cuerpo) > 100 and encima and min(encima) >= 155 - 0.1,
-                  "se apoya sobre la mesa (mínimo y sobre la mesa {:.1f})".format(min(encima) if encima else -1))
+                  "se apoya sobre la mesa (mínimo y sobre la mesa {:.1f}, {} puntos de {})".format(
+                      min(encima) if encima else -1, len(encima), len(puntos)))
         fuera = [p[1] for p in puntos if p[0] < 120 or p[0] > 380]
         comprobar(fuera and min(fuera) >= -0.1, "y fuera de la mesa, sobre el suelo")
         escena.poner_apoyos([n], [])
