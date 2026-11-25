@@ -1,0 +1,33 @@
+"""Campos de la ventana de PipeEditor (sin Qt ni Maya, para poder comprobarlos)."""
+
+from pipeeditor import construir, perfiles, piezas
+
+# Campos: (clave, control, opciones o (mínimo, máximo, decimales, paso, sufijo), tipos, sección)
+CAMPOS = [
+    ("perfil_cable", "lista", perfiles.PERFILES_CABLE, ("cable",), "forma"),
+    ("perfil_tuberia", "lista", perfiles.PERFILES_TUBERIA, ("tuberia",), "forma"),
+    ("grosor", "numero", (0.05, 200.0, 2, 0.5, " cm"), ("cable", "tuberia"), "forma"),
+    ("lados", "entero", (3, 32, 0, 1, ""), ("cable", "tuberia"), "forma"),
+    ("segmentos_metro", "entero", (2, 100, 0, 2, ""), ("cable",), "forma"),
+    ("pared", "numero", (0.0, 20.0, 2, 0.1, " cm"), ("tuberia",), "forma"),
+    ("holgura", "porcentaje", (0.0, 100.0, 0, 1, " %"), ("cable",), "caida"),
+    ("modo_tension", "lista", construir.MODOS_TENSION, ("cable",), "caida"),
+    ("salida", "numero", (0.0, 100.0, 1, 0.5, " cm"), ("cable", "tuberia"), "caida"),
+    ("apoyar_suelo", "casilla", None, ("cable",), "caida"),
+    ("altura_suelo", "numero", (-10000.0, 10000.0, 1, 1.0, " cm"), ("cable",), "caida"),
+    ("recorrido", "lista", ("z", "l", "libre"), ("tuberia",), "recorrido"),
+    ("radio_codo", "numero", (0.0, 10.0, 2, 0.25, " ×"), ("tuberia",), "recorrido"),
+    ("codo", "lista", construir.CODOS, ("tuberia",), "recorrido"),
+    ("conector_inicio", "lista", piezas.CONECTORES, ("cable",), "extremos"),
+    ("conector_fin", "lista", piezas.CONECTORES, ("cable",), "extremos"),
+    ("extremos", "lista", piezas.EXTREMOS_TUBERIA, ("tuberia",), "extremos"),
+    ("pieza", "lista", piezas.PIEZAS_CABLE, ("cable",), "a_lo_largo"),
+    ("separacion_piezas", "numero", (1.0, 1000.0, 1, 5.0, " cm"), ("cable",), "a_lo_largo"),
+    ("separacion_bridas", "numero", (0.0, 5000.0, 1, 10.0, " cm"), ("tuberia",), "a_lo_largo"),
+    ("separacion_soportes", "numero", (0.0, 5000.0, 1, 10.0, " cm"), ("tuberia",), "a_lo_largo"),
+    ("alcance_soportes", "numero", (1.0, 5000.0, 1, 5.0, " cm"), ("tuberia",), "a_lo_largo"),
+    ("haz", "entero", (1, 37, 0, 1, ""), ("cable",), "haz"),
+    ("torsion", "numero", (-10.0, 10.0, 2, 0.25, ""), ("cable",), "haz"),
+    ("separacion_bridas_haz", "numero", (0.0, 1000.0, 1, 5.0, " cm"), ("cable",), "haz"),
+]
+SECCIONES = ("forma", "caida", "recorrido", "extremos", "a_lo_largo", "haz", "material")

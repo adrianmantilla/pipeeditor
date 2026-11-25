@@ -1,0 +1,71 @@
+// Pestaña «PipeEditor» del Editor de atributos para el nodo pipeEditorNodo.
+// Los textos salen de scripts/pipeeditor/i18n, como los de la ventana.
+
+global proc string pipeEditorTexto(string $clave)
+{
+    return `python ("__import__('pipeeditor.i18n', fromlist=['t']).t('" + $clave + "')")`;
+}
+
+global proc AEpipeEditorNodoTemplate(string $nodo)
+{
+    editorTemplate -beginScrollLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_general")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_tipo")) -addControl "tipo";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_forma")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_perfil_cable")) -addControl "perfilCable";
+        editorTemplate -label (pipeEditorTexto("campo_perfil_tuberia")) -addControl "perfilTuberia";
+        editorTemplate -label (pipeEditorTexto("campo_grosor")) -addControl "grosor";
+        editorTemplate -label (pipeEditorTexto("campo_lados")) -addControl "lados";
+        editorTemplate -label (pipeEditorTexto("campo_segmentos_metro")) -addControl "segmentosMetro";
+        editorTemplate -label (pipeEditorTexto("campo_pared")) -addControl "pared";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_caida")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_holgura")) -addControl "holgura";
+        editorTemplate -label (pipeEditorTexto("campo_modo_tension")) -addControl "modoTension";
+        editorTemplate -label (pipeEditorTexto("campo_salida")) -addControl "salida";
+        editorTemplate -label (pipeEditorTexto("campo_apoyar_suelo")) -addControl "apoyarSuelo";
+        editorTemplate -label (pipeEditorTexto("campo_altura_suelo")) -addControl "alturaSuelo";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_recorrido")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_recorrido")) -addControl "recorrido";
+        editorTemplate -label (pipeEditorTexto("campo_radio_codo")) -addControl "radioCodo";
+        editorTemplate -label (pipeEditorTexto("campo_codo")) -addControl "codo";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_extremos")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_conector_inicio")) -addControl "conectorInicio";
+        editorTemplate -label (pipeEditorTexto("campo_conector_fin")) -addControl "conectorFin";
+        editorTemplate -label (pipeEditorTexto("campo_extremos")) -addControl "extremos";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_a_lo_largo")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_pieza")) -addControl "pieza";
+        editorTemplate -label (pipeEditorTexto("campo_separacion_piezas")) -addControl "separacionPiezas";
+        editorTemplate -label (pipeEditorTexto("campo_separacion_bridas")) -addControl "separacionBridas";
+        editorTemplate -label (pipeEditorTexto("campo_separacion_soportes")) -addControl "separacionSoportes";
+        editorTemplate -label (pipeEditorTexto("campo_alcance_soportes")) -addControl "alcanceSoportes";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_haz")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_haz")) -addControl "haz";
+        editorTemplate -label (pipeEditorTexto("campo_torsion")) -addControl "torsion";
+        editorTemplate -label (pipeEditorTexto("campo_separacion_bridas_haz")) -addControl "separacionBridasHaz";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_resultado")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_longitud_total")) -addControl "longitudTotal";
+        editorTemplate -label (pipeEditorTexto("campo_caida_maxima")) -addControl "caida";
+        editorTemplate -label (pipeEditorTexto("campo_triangulos")) -addControl "triangulos";
+        editorTemplate -label (pipeEditorTexto("campo_tensos")) -addControl "tensos";
+    editorTemplate -endLayout;
+    editorTemplate -suppress "anclas";
+    editorTemplate -suppress "factores";
+    editorTemplate -suppress "longitudes";
+    editorTemplate -suppress "ruta";
+    editorTemplate -suppress "apoyos";
+    editorTemplate -suppress "conectorPropio";
+    editorTemplate -suppress "cuerpo";
+    editorTemplate -suppress "piezas";
+    editorTemplate -suppress "curva";
+    editorTemplate -suppress "longitudesActuales";
+    AEdependNodeTemplate $nodo;
+    editorTemplate -addExtraControls;
+    editorTemplate -endScrollLayout;
+}

@@ -1,0 +1,27 @@
+name: Pruebas sin Maya
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pruebas:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"  # el Python de Maya 2026 y 2027
+      - name: PySide6 para probar la ventana
+        run: python -m pip install PySide6
+      - name: Librerías gráficas (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon0
+      - name: Pruebas
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests -v
