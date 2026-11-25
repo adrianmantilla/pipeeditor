@@ -349,25 +349,70 @@ def _empujar(apoyos):
         P = np.array([(p.x, p.y, p.z) for p in pts], dtype=float)
         cajas.append((P.min(axis=0), P.max(axis=0)) if len(P) else None)
 
-    def empujar(P, radio):
+    def cercano(fn, punto):
+        try:
+            q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kWorld)
+        except RuntimeError:
+            q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kObject)
+        n.normalize()
+        return q, n
+
+    def por_donde_entro(fn, acel, antes, punto):
+        """Punto y normal de la superficie que cruza el tramo de ``antes`` a ``punto``."""
+        d = punto - antes
+        largo = d.length()
+        if largo < 1e-9:
+            return None
+        d /= largo
+        origen = om.MFloatPoint(antes.x, antes.y, antes.z)
+        direccion = om.MFloatVector(d.x, d.y, d.z)
+        golpe = None
+        for espacio in (om.MSpace.kWorld, om.MSpace.kObject):
+            try:
+                try:
+                    golpe = fn.closestIntersection(origen, direccion, espacio, largo * 1.001, False,
+                                                   accelParams=acel)
+                except TypeError:
+                    golpe = fn.closestIntersection(origen, direccion, espacio, largo * 1.001, False)
+                break
+            except RuntimeError:
+                golpe = None
+        if not golpe or golpe[2] < 0:
+            return None
+        h = om.MPoint(golpe[0].x, golpe[0].y, golpe[0].z)
+        _q, n = cercano(fn, h)
+        if n * d > 0:  # la normal debe mirar hacia donde venía el punto
+            n = -n
+        return h, n
+
+    def empujar(P, radio, antes=None):
         Q = np.array(P, dtype=float)
         contacto = np.zeros(len(Q), dtype=bool)
-        for (fn, _acel), caja in zip(apoyos, cajas):
+        for (fn, acel), caja in zip(apoyos, cajas):
             if caja is None:
                 continue
             lo, hi = caja
             cerca = np.nonzero(np.all((Q > lo - radio) & (Q < hi + radio), axis=1))[0]
             for i in cerca:
                 punto = om.MPoint(*Q[i])
-                try:
-                    q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kWorld)
-                except RuntimeError:
-                    q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kObject)
-                n.normalize()
+                q, n = cercano(fn, punto)
                 d = (punto - q) * n
-                if d < radio:
-                    Q[i] += np.array((n.x, n.y, n.z)) * (radio - d)
-                    contacto[i] = True
+                if d >= radio:
+                    continue
+                if d < 0 and antes is not None:
+                    # Está dentro: sale por donde entró, no por la cara más cercana
+                    # (si no, en una mesa fina saldría por debajo).
+                    previo = om.MPoint(*antes[i])
+                    qa, na = cercano(fn, previo)
+                    if (previo - qa) * na >= 0:
+                        cruce = por_donde_entro(fn, acel, previo, punto)
+                        if cruce is not None:
+                            h, nh = cruce
+                            Q[i] = np.array((h.x + nh.x * radio, h.y + nh.y * radio, h.z + nh.z * radio))
+                            contacto[i] = True
+                            continue
+                Q[i] += np.array((n.x, n.y, n.z)) * (radio - d)
+                contacto[i] = True
         return Q, contacto
     return empujar
 

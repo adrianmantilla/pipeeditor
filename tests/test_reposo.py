@@ -19,13 +19,18 @@ def caja(minimo, maximo):
     lo = np.array(minimo, dtype=float)
     hi = np.array(maximo, dtype=float)
 
-    def empujar(P, radio):
+    def empujar(P, radio, antes=None):
         P = np.array(P, dtype=float)
         dentro = np.all((P > lo - radio) & (P < hi + radio), axis=1)
         for i in np.nonzero(dentro)[0]:
             p = P[i]
-            # sacar por la cara más cercana
             distancias = np.concatenate([p - (lo - radio), (hi + radio) - p])
+            if antes is not None:
+                # sale por la cara por la que entró (la que el punto anterior tenía fuera)
+                a = np.asarray(antes[i])
+                fuera = np.concatenate([a <= lo - radio, a >= hi + radio])
+                if fuera.any():
+                    distancias = np.where(fuera, distancias, np.inf)
             k = int(np.argmin(distancias))
             if k < 3:
                 P[i, k] = lo[k] - radio
@@ -97,6 +102,22 @@ class Reposo(unittest.TestCase):
         encima = [p for p in r.curva if 160 < p[0] < 240 and abs(p[2]) < 90]
         self.assertTrue(encima)
         self.assertGreater(min(p[1] for p in encima), 50.0)
+
+    def test_mesa_fina_no_se_atraviesa_por_debajo(self):
+        # Tablero de 3 cm, más fino que los tramos del cable: antes salía por debajo.
+        mesa = caja((120, 60, -60), (280, 63, 60))
+        r = c.construir({"holgura": 0.9, "salida": 0.0, "grosor": 1.0}, A, bajar=mesa.bajar, empujar=mesa)
+        debajo = [p for p in r.curva if 125 < p[0] < 275 and abs(p[2]) < 55 and 2.0 < p[1] < 60]
+        self.assertFalse(debajo, "hay cable bajo el tablero")
+
+    def test_suelo_pocas_curvas_amplias(self):
+        # El sobrante en el suelo: pocas curvas grandes, no un muelle.
+        r = c.construir({"holgura": 0.6, "salida": 0.0, "grosor": 0.7, "rigidez": 0.15}, A)
+        suelo = [p for p in r.curva if p[1] < 0.5]
+        zs = [p[2] for p in suelo]
+        cambios = sum(1 for a, b, d in zip(zs, zs[1:], zs[2:]) if (b - a) * (d - b) < 0 and abs(b) > 1.0)
+        self.assertLessEqual(cambios, 8)
+        self.assertGreater(max(abs(z) for z in zs), 10.0)
 
     def test_poste_en_medio_por_los_lados(self):
         # Un poste vertical que la catenaria atraviesa: antes se ignoraba.

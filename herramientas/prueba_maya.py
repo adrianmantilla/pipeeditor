@@ -162,10 +162,12 @@ def main():
         cmds.setAttr(n + ".holgura", 1.0)
         escena.poner_apoyos([n], [mesa])
         puntos = puntos_curva(curva)
-        encima = [p[1] for p in puntos if 170 < p[0] < 330]
+        encima = [p[1] for p in puntos if 170 < p[0] < 330 and -40 < p[2] < 140]
         comprobar(caras(cuerpo) > 100 and encima and min(encima) >= 155 - 0.1,
                   "se apoya sobre la mesa (mínimo y sobre la mesa {:.1f}, {} puntos de {})".format(
                       min(encima) if encima else -1, len(encima), len(puntos)))
+        metidos = dentro_de(puntos, cmds.exactWorldBoundingBox(mesa), margen=0.5)
+        comprobar(not metidos, "no atraviesa la mesa ({} puntos dentro)".format(len(metidos)))
         fuera = [p[1] for p in puntos if p[0] < 120 or p[0] > 380]
         comprobar(fuera and min(fuera) >= -0.1, "y fuera de la mesa, sobre el suelo")
         escena.poner_apoyos([n], [])
@@ -197,9 +199,10 @@ def main():
         c_tub, p_tub, _ = escena.formas_de(nt)
         comprobar(caras(c_tub) > 100, "la tubería tiene malla")
         comprobar(caras(p_tub) > 100, "bridas y manguitos")
-        sin_soportes = caras(p_tub)
+        m_tub = escena.forma_de(nt, "metal")
+        sin_soportes = caras(p_tub) + caras(m_tub)
         escena.poner_apoyos([nt], [pared])
-        comprobar(caras(p_tub) > sin_soportes, "soportes a la pared")
+        comprobar(caras(p_tub) + caras(m_tub) > sin_soportes, "soportes a la pared (van en la malla de metal)")
         comprobar(materiales.de(c_tub) == "cobre", "material de la tubería")
 
         # --- desde una curva y desde aristas ---

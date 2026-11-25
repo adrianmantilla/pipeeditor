@@ -115,8 +115,9 @@ def construir_escena(cmds, escena):
 
     # Cámara y luces.
     cam, forma = cmds.camera(name="camReferencia", focalLength=35)
-    cmds.xform(cam, worldSpace=True, translation=(80, 230, 820))
-    cmds.viewLookAt(forma, position=(0, 80, -60))
+    cmds.setAttr(forma + ".focalLength", 28)
+    cmds.xform(cam, worldSpace=True, translation=(40, 260, 980))
+    cmds.viewLookAt(forma, position=(20, 150, -150))
     cmds.setAttr(forma + ".renderable", 1)
     for c in cmds.ls(type="camera"):
         if c != forma:
@@ -157,11 +158,35 @@ def renderizar(cmds, camara, png):
     else:
         raise RuntimeError("no encuentro kick junto a mtoa ({})".format(raiz_mtoa))
     sombras = os.path.join(os.path.dirname(kick), "..", "shaders")
-    orden = [kick, "-i", ass, "-o", png, "-r", "1280", "720", "-dw", "-dp", "-v", "1", "-l", sombras]
+    limpiar_ass(ass)
+    exr = os.path.splitext(png)[0] + ".exr"
+    # -sl: sin licencia (marca de agua), suficiente para comparar versiones.
+    orden = [kick, "-i", ass, "-o", exr, "-r", "1280", "720", "-dw", "-dp", "-sl", "-v", "1", "-l", sombras]
     print(" ".join(orden))
     t = time.time()
     subprocess.check_call(orden)
-    print("Render en {:.0f} s: {}".format(time.time() - t, png))
+    print("Render en {:.0f} s".format(time.time() - t))
+    a_png(os.path.dirname(kick), exr, png)
+    print("Imagen:", png)
+
+
+def limpiar_ass(ass):
+    """Quita el denoiser de la salida: sin licencia, kick no lo carga."""
+    with open(ass) as f:
+        lineas = f.readlines()
+    limpias = [l for l in lineas if "defaultArnoldDenoiser" not in l]
+    if len(limpias) != len(lineas):
+        with open(ass, "w") as f:
+            f.writelines(limpias)
+
+
+def a_png(bin_arnold, exr, png):
+    """Convierte el EXR lineal a PNG sRGB con oiiotool (viene con Arnold)."""
+    oiio = os.path.join(bin_arnold, "oiiotool" + (".exe" if os.name == "nt" else ""))
+    if os.path.exists(oiio):
+        subprocess.check_call([oiio, exr, "--ch", "R,G,B", "--colorconvert", "linear", "sRGB", "-o", png])
+        return
+    print("Sin oiiotool: queda solo el EXR", exr)
 
 
 def main():

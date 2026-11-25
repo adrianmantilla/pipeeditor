@@ -167,11 +167,14 @@ def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, 
             return _a_interno(golpe[0]), _a_interno(golpe[1])
     empujar_i = None
     if empujar is not None:
-        def empujar_i(P, radio):
+        def a_escena(P):
             import numpy as np
             P = np.asarray(P, dtype=float)
-            fuera = np.stack([P[:, 0], -P[:, 2], P[:, 1]], axis=1)
-            Q, contacto = empujar(fuera, radio)
+            return np.stack([P[:, 0], -P[:, 2], P[:, 1]], axis=1)
+
+        def empujar_i(P, radio, antes=None):
+            import numpy as np
+            Q, contacto = empujar(a_escena(P), radio, None if antes is None else a_escena(antes))
             Q = np.asarray(Q, dtype=float)
             return np.stack([Q[:, 0], Q[:, 2], -Q[:, 1]], axis=1), contacto
     cajas = []
@@ -273,8 +276,11 @@ def _largo_tramo(a, anclaje, p, q, factor=1.0):
 
 
 def _catenarias(a, anclajes, paradas, r, suelo, bajar, res, factor=1.0, contar=True):
-    """Catenaria apoyada de cada tramo, su longitud y si toca algo."""
-    tramos, largos, toca = [], [], False
+    """Catenaria apoyada de cada tramo, su longitud y si toca algo.
+
+    Deja en ``_catenarias.contactos`` qué puntos de cada tramo se apoyan.
+    """
+    tramos, largos, toca, contactos = [], [], False, []
     for i in range(len(paradas) - 1):
         p, q = paradas[i], paradas[i + 1]
         largo = _largo_tramo(a, anclajes[i], p, q, factor)
@@ -282,10 +288,16 @@ def _catenarias(a, anclajes, paradas, r, suelo, bajar, res, factor=1.0, contar=T
             res.tensos += 1
         libre = catenaria.puntos(p, q, largo, _segmentos(largo, a))
         tramo = apoyo.apoyar_tramo(libre, r, suelo, bajar)
-        if any(abs(u[1] - v[1]) > 1e-9 for u, v in zip(libre, tramo)):
+        cambiados = [abs(u[1] - v[1]) > 1e-9 for u, v in zip(libre, tramo)]
+        if any(cambiados):
             toca = True
+        # Solo lo tumbado en el suelo recibe las curvas del sobrante; sobre una
+        # mesa, el sobrante cae por los bordes con el reposo.
+        apoyados = [c and suelo is not None and v[1] <= suelo + r + 1e-6 for c, v in zip(cambiados, tramo)]
         tramos.append(tramo)
         largos.append(largo)
+        contactos.append(apoyados)
+    _catenarias.contactos = contactos
     return tramos, largos, toca
 
 
@@ -298,20 +310,31 @@ def _toca_objetos(empujar, tramos, r):
     return bool(np.any(contacto))
 
 
-def _reposar(a, anclajes, tramos, largos, c0, c1, salida, r, suelo, empujar, semilla, otros=()):
-    """Cadena para el reposo a partir de las catenarias apoyadas, y su resultado."""
+def _reposar(a, anclajes, tramos, largos, c0, c1, salida, r, suelo, empujar, semilla, contactos=None,
+             pasos=110):
+    """Reposo de un cable a partir de sus catenarias apoyadas."""
+    cadena = _cadena(a, anclajes, tramos, largos, c0, c1, salida, r, semilla, contactos)
+    x = reposo.reposar(cadena, r, suelo=suelo, empujar=empujar, rigidez=a["rigidez"], pasos=pasos)
+    return [tuple(float(c) for c in p) for p in x]
+
+
+def _cadena(a, anclajes, tramos, largos, c0, c1, salida, r, semilla, contactos=None, puntos_max=180):
+    """Cadena de puntos para el reposo, con el cable que sobra ya repartido en el suelo."""
     total = sum(largos)
-    paso = max(total / 180.0, r * 1.5)
+    paso = max(total / float(puntos_max), r * 1.5)
+    contactos = contactos or [[False] * len(t) for t in tramos]
     puntos, rest, fijos, ganchos = [], [], [], []
     if salida > 0:
         puntos.append(c0)
         rest.append(vec.distancia(c0, tramos[0][0]))
         fijos.append(0)
-    amplitud = r * (0.08 + 6.0 * max(0.0, a["ondulacion"]))
+    amplitud = r * (0.02 + 6.0 * max(0.0, a["ondulacion"]))
     for i, (tramo, largo) in enumerate(zip(tramos, largos)):
         partes = max(3, int(round(largo / paso)))
-        ini = reposo.repartir(tramo, partes)
-        ini = reposo.ondulacion(ini, amplitud, semilla * 7919 + i, r * 70.0)
+        # El cable que sobra se reparte en curvas amplias donde está tumbado.
+        tumbado = reposo.ondas_suelo(tramo, largo, r, a["rigidez"], semilla * 7919 + i, contactos[i])
+        ini = reposo.repartir(tumbado, partes)
+        ini = reposo.ondulacion(ini, amplitud, semilla * 7919 + i, max(r * 70.0, largo / 3.0))
         if i == 0:
             fijos.append(len(puntos))
             puntos.append(tuple(ini[0]))
@@ -328,9 +351,7 @@ def _reposar(a, anclajes, tramos, largos, c0, c1, salida, r, suelo, empujar, sem
         rest.append(vec.distancia(puntos[-1], c1))
         puntos.append(c1)
         fijos.append(len(puntos) - 1)
-    cadena = reposo.Cadena(puntos, rest, fijos, ganchos)
-    x = reposo.reposar(cadena, r, suelo=suelo, empujar=empujar, rigidez=a["rigidez"], otros=otros)
-    return [tuple(float(c) for c in p) for p in x]
+    return reposo.Cadena(puntos, rest, fijos, ganchos)
 
 
 def _camino_colgante(a, anclajes, inicio, fin, r, suelo, bajar, res, empujar=None):
@@ -346,7 +367,8 @@ def _camino_colgante(a, anclajes, inicio, fin, r, suelo, bajar, res, empujar=Non
     ganchos = any(x.desliza for x in anclajes[1:-1])
     usar = a["reposo"] and reposo.disponible() and (toca or ganchos or _toca_objetos(empujar, tramos, r))
     if usar:
-        camino = _reposar(a, anclajes, tramos, largos, c0, c1, salida, r, suelo, empujar, a["semilla"])
+        camino = _reposar(a, anclajes, tramos, largos, c0, c1, salida, r, suelo, empujar, a["semilla"],
+                          contactos=_catenarias.contactos)
         res.reposado = True
         res.longitudes = largos
         for t in tramos:
@@ -370,7 +392,12 @@ def _camino_colgante(a, anclajes, inicio, fin, r, suelo, bajar, res, empujar=Non
 
 
 def _haz_suelto(a, anclajes, inicio, fin, r, suelo, bajar, empujar, res):
-    """Cada cable del haz con su propio recorrido, sin atravesar a los demás."""
+    """Cada cable del haz con su propio recorrido, sin atravesar a los demás.
+
+    Todos parten de la forma del cable del centro (desplazada a su sitio), así
+    se tumban juntos como un mazo; cada uno tiene su propia longitud
+    (``variacion``) y el reposo hace que cuelguen distinto y se aparten.
+    """
     import random
     cantidad = max(1, int(a["haz"]))
     c0, s0, s1, c1, salida = _extremos(a, anclajes, inicio, fin)
@@ -379,19 +406,30 @@ def _haz_suelto(a, anclajes, inicio, fin, r, suelo, bajar, empujar, res):
     lado = vec.unitario(lado, (1.0, 0.0, 0.0))
     arriba = vec.unitario(vec.cruz(lado, direccion), (0.0, 1.0, 0.0))
     azar = random.Random(int(a["semilla"]) * 31 + 7)
-    hilos = []
+    r_total = perfiles.radio_haz(cantidad, r)
+    paradas = [s0] + [x.posicion for x in anclajes[1:-1]] + [s1]
+    tramos, largos, _toca = _catenarias(a, anclajes, paradas, r_total, suelo, bajar, res)
+    res.longitudes = largos
+    for t in tramos:
+        res.caida = max(res.caida, catenaria.caida(t))
+    centro = _cadena(a, anclajes, tramos, largos, c0, c1, salida, r, a["semilla"], _catenarias.contactos,
+                     puntos_max=int(min(220, max(120, sum(largos) / (2.5 * r)))))
+    rectos = set()
+    if salida > 0:
+        rectos = {0, len(centro.largos) - 1}
+    holgura = max(a["holgura"], 0.0)
+    cadenas = []
     for k, (x0, y0) in enumerate(perfiles.posiciones_haz(cantidad, 2.0 * r * 1.05)):
         o = vec.suma(vec.escala(lado, x0), vec.escala(arriba, y0))
-        factor = 1.0 + max(0.0, a["variacion"]) * (azar.random() - 0.5) * 0.8
-        paradas = [vec.suma(s0, o)] + [vec.suma(x.posicion, o) for x in anclajes[1:-1]] + [vec.suma(s1, o)]
-        tramos, largos, _toca = _catenarias(a, anclajes, paradas, r, suelo, bajar, res, factor, contar=k == 0)
-        if k == 0:
-            res.longitudes = largos
-            for t in tramos:
-                res.caida = max(res.caida, catenaria.caida(t))
-        camino = _reposar(a, anclajes, tramos, largos, vec.suma(c0, o), vec.suma(c1, o), salida, r, suelo,
-                          empujar, a["semilla"] + k * 101, otros=hilos)
-        hilos.append(camino)
+        factor = 1.0 + max(0.0, a["variacion"]) * (azar.random() - 0.5) * 0.8 if k else 1.0
+        escala = (1.0 + holgura * factor) / (1.0 + holgura)
+        puntos = [vec.suma(p, o) for p in centro.puntos]
+        rest = [l if i in rectos else l * escala for i, l in enumerate(centro.largos)]
+        cadenas.append(reposo.Cadena(puntos, rest, centro.fijos, [vec.suma(g, o) for g in centro.ganchos]))
+    # Todos a la vez, sin atravesarse entre sí.
+    resultado = reposo.reposar_varias(cadenas, r * 1.02, suelo=suelo, empujar=empujar, rigidez=a["rigidez"],
+                                      pasos=70)
+    hilos = [[tuple(float(c) for c in p) for p in x] for x in resultado]
     res.reposado = True
     return [trazado.limpiar_repetidos(_sobre_suelo(trazado.suavizar(h), suelo, r)) for h in hilos]
 
