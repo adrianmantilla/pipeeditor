@@ -28,6 +28,7 @@ ENUMS = {
     "recorrido": ("z", "l", "libre"),
     "codo": construir.CODOS,
     "extremos": piezas.EXTREMOS_TUBERIA,
+    "arriba": construir.EJES,
 }
 NUMEROS = [
     # atributo, clave, tipo, mínimo, máximo suave
@@ -37,6 +38,11 @@ NUMEROS = [
     ("salida", "salida", "d", 0.0, 50.0),
     ("apoyarSuelo", "apoyar_suelo", "b", None, None),
     ("alturaSuelo", "altura_suelo", "d", None, None),
+    ("reposo", "reposo", "b", None, None),
+    ("rigidez", "rigidez", "d", 0.0, 1.0),
+    ("ondulacion", "ondulacion", "d", 0.0, 1.0),
+    ("variacion", "variacion", "d", 0.0, 1.0),
+    ("semilla", "semilla", "i", 0, 1000),
     ("holgura", "holgura", "d", 0.0, 1.0),
     ("separacionPiezas", "separacion_piezas", "d", 1.0, 500.0),
     ("haz", "haz", "i", 1, 37),
@@ -52,6 +58,7 @@ CLAVE_DE_ENUM = {
     "tipo": "tipo", "perfilCable": "perfil_cable", "modoTension": "modo_tension",
     "conectorInicio": "conector_inicio", "conectorFin": "conector_fin", "pieza": "pieza",
     "perfilTuberia": "perfil_tuberia", "recorrido": "recorrido", "codo": "codo", "extremos": "extremos",
+    "arriba": "arriba",
 }
 # Atributos de ajuste por orden, para la interfaz y los estilos.
 AJUSTES = list(ENUMS) + [n[0] for n in NUMEROS]
@@ -97,6 +104,9 @@ class PipeEditorNodo(om.MPxNode):
         num.array = True
         num.usesArrayDataBuilder = True
         A["longitudes"] = num.create("longitudes", "lon", om.MFnNumericData.kDouble, 0.0)
+        num.array = True
+        num.usesArrayDataBuilder = True
+        A["deslizan"] = num.create("deslizan", "des", om.MFnNumericData.kBoolean, False)
         num.array = True
         num.usesArrayDataBuilder = True
         A["ruta"] = typ.create("ruta", "rut", om.MFnData.kNurbsCurve)
@@ -193,13 +203,15 @@ class PipeEditorNodo(om.MPxNode):
 
         factores = _valores_array(datos.inputArrayValue(A["factores"]), lambda h: h.asDouble())
         longitudes = _valores_array(datos.inputArrayValue(A["longitudes"]), lambda h: h.asDouble())
+        deslizan = _valores_array(datos.inputArrayValue(A["deslizan"]), lambda h: h.asBool())
         matrices = _valores_array(datos.inputArrayValue(A["anclas"]), lambda h: h.asMatrix())
         anclajes = []
         for indice in sorted(matrices):
             m = matrices[indice]
             pos = (m.getElement(3, 0), m.getElement(3, 1), m.getElement(3, 2))
             normal = (m.getElement(1, 0), m.getElement(1, 1), m.getElement(1, 2))
-            anclajes.append(construir.Anclaje(pos, normal, factores.get(indice, 1.0), longitudes.get(indice, 0.0)))
+            anclajes.append(construir.Anclaje(pos, normal, factores.get(indice, 1.0), longitudes.get(indice, 0.0),
+                                              deslizan.get(indice, False)))
 
         ruta, lineal = _ruta(datos.inputValue(A["ruta"]), ajustes["segmentos_metro"])
         apoyos = []
@@ -214,10 +226,12 @@ class PipeEditorNodo(om.MPxNode):
         h = datos.inputValue(A["conectorPropio"]).asMesh()
         if not h.isNull():
             propio = _malla_python(om.MFnMesh(h))
-        bajar = _bajar(apoyos) if apoyos else None
+        eje = 2 if ajustes["arriba"] == "z" else 1
+        bajar = _bajar(apoyos, eje) if apoyos else None
         cercano = _cercano(apoyos) if apoyos else None
+        empujar = _empujar(apoyos) if apoyos else None
         return construir.construir(ajustes, anclajes, ruta=ruta, ruta_lineal=lineal, bajar=bajar,
-                                   cercano=cercano, malla_propia=propio)
+                                   cercano=cercano, malla_propia=propio, empujar=empujar)
 
 
 def _valores_array(arr, leer):
@@ -249,8 +263,9 @@ def _ruta(handle, segmentos_metro):
     return puntos, False
 
 
-def _bajar(apoyos):
-    abajo = om.MFloatVector(0.0, -1.0, 0.0)
+def _bajar(apoyos, eje=1):
+    """Altura (en el eje vertical ``eje``) de la primera superficie bajo un punto."""
+    abajo = om.MFloatVector(0.0, 0.0, -1.0) if eje == 2 else om.MFloatVector(0.0, -1.0, 0.0)
 
     def bajar(x, y, z):
         mejor = None
@@ -268,7 +283,7 @@ def _bajar(apoyos):
                 except RuntimeError:
                     golpe = None
             if golpe and golpe[2] >= 0:
-                altura = golpe[0].y
+                altura = golpe[0].z if eje == 2 else golpe[0].y
                 if mejor is None or altura > mejor:
                     mejor = altura
         return mejor
@@ -290,6 +305,44 @@ def _cercano(apoyos):
                 mejor, distancia = ((q.x, q.y, q.z), (n.x, n.y, n.z)), d
         return mejor
     return cercano
+
+
+def _empujar(apoyos):
+    """Saca de las mallas de apoyo los puntos del cable (para el reposo)."""
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    cajas = []
+    for fn, _acel in apoyos:
+        try:
+            pts = fn.getPoints(om.MSpace.kWorld)
+        except RuntimeError:
+            pts = fn.getPoints()
+        P = np.array([(p.x, p.y, p.z) for p in pts], dtype=float)
+        cajas.append((P.min(axis=0), P.max(axis=0)) if len(P) else None)
+
+    def empujar(P, radio):
+        Q = np.array(P, dtype=float)
+        contacto = np.zeros(len(Q), dtype=bool)
+        for (fn, _acel), caja in zip(apoyos, cajas):
+            if caja is None:
+                continue
+            lo, hi = caja
+            cerca = np.nonzero(np.all((Q > lo - radio) & (Q < hi + radio), axis=1))[0]
+            for i in cerca:
+                punto = om.MPoint(*Q[i])
+                try:
+                    q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kWorld)
+                except RuntimeError:
+                    q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kObject)
+                n.normalize()
+                d = (punto - q) * n
+                if d < radio:
+                    Q[i] += np.array((n.x, n.y, n.z)) * (radio - d)
+                    contacto[i] = True
+        return Q, contacto
+    return empujar
 
 
 def _malla_python(fn):

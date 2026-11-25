@@ -15,6 +15,12 @@ CAMPOS = [
     ("salida", "numero", (0.0, 100.0, 1, 0.5, " cm"), ("cable", "tuberia"), "caida"),
     ("apoyar_suelo", "casilla", None, ("cable",), "caida"),
     ("altura_suelo", "numero", (-10000.0, 10000.0, 1, 1.0, " cm"), ("cable",), "caida"),
+    ("arriba", "lista", construir.EJES, ("cable", "tuberia"), "caida"),
+    ("reposo", "casilla", None, ("cable",), "reposo"),
+    ("rigidez", "porcentaje", (0.0, 100.0, 0, 5, " %"), ("cable",), "reposo"),
+    ("ondulacion", "porcentaje", (0.0, 100.0, 0, 5, " %"), ("cable",), "reposo"),
+    ("variacion", "porcentaje", (0.0, 100.0, 0, 5, " %"), ("cable",), "reposo"),
+    ("semilla", "entero", (0, 1000, 0, 1, ""), ("cable",), "reposo"),
     ("recorrido", "lista", ("z", "l", "libre"), ("tuberia",), "recorrido"),
     ("radio_codo", "numero", (0.0, 10.0, 2, 0.25, " ×"), ("tuberia",), "recorrido"),
     ("codo", "lista", construir.CODOS, ("tuberia",), "recorrido"),
@@ -30,4 +36,4 @@ CAMPOS = [
     ("torsion", "numero", (-10.0, 10.0, 2, 0.25, ""), ("cable",), "haz"),
     ("separacion_bridas_haz", "numero", (0.0, 1000.0, 1, 5.0, " cm"), ("cable",), "haz"),
 ]
-SECCIONES = ("forma", "caida", "recorrido", "extremos", "a_lo_largo", "haz", "material")
+SECCIONES = ("forma", "caida", "reposo", "recorrido", "extremos", "a_lo_largo", "haz", "material")

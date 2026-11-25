@@ -16,8 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"  # el Python de Maya 2026 y 2027
-      - name: PySide6 para probar la ventana
-        run: python -m pip install PySide6
+      - name: PySide6 y numpy (Maya trae numpy)
+        run: python -m pip install PySide6 numpy
       - name: Librerías gráficas (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon0

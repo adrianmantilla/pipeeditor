@@ -22,6 +22,7 @@ from pipeeditor import construir, materiales, nodo, vec
 ATRIB_GRUPO = "pipeEditorNodo"
 ATRIB_FACTOR = "pipeFactor"
 ATRIB_LONGITUD = "pipeLongitud"
+ATRIB_DESLIZA = "pipeDesliza"
 
 
 # --- utilidades -----------------------------------------------------------------------
@@ -137,12 +138,19 @@ def _crear_ancla(nombre, posicion, normal, padre, tamano):
                  defaultValue=1.0, minValue=0.0, softMaxValue=4.0, keyable=True)
     cmds.addAttr(loc, longName=ATRIB_LONGITUD, niceName="Longitud fija del tramo", attributeType="double",
                  defaultValue=0.0, minValue=0.0, keyable=False)
+    _anadir_desliza(loc)
     return loc
+
+
+def _anadir_desliza(loc):
+    if not cmds.attributeQuery(ATRIB_DESLIZA, node=loc, exists=True):
+        cmds.addAttr(loc, longName=ATRIB_DESLIZA, niceName="Pasa sin atarse (gancho)", attributeType="bool",
+                     defaultValue=False, keyable=True)
 
 
 def _reconectar(n, anclas):
     """Conecta ``anclas`` (en orden) a las entradas del nodo, quitando lo anterior."""
-    for atributo in ("anclas", "factores", "longitudes"):
+    for atributo in ("anclas", "factores", "longitudes", "deslizan"):
         for i in cmds.getAttr("{}.{}".format(n, atributo), multiIndices=True) or []:
             plug = "{}.{}[{}]".format(n, atributo, i)
             for f in cmds.listConnections(plug, source=True, destination=False, plugs=True) or []:
@@ -152,6 +160,8 @@ def _reconectar(n, anclas):
         cmds.connectAttr(a + ".worldMatrix[0]", "{}.anclas[{}]".format(n, i), force=True)
         cmds.connectAttr(a + "." + ATRIB_FACTOR, "{}.factores[{}]".format(n, i), force=True)
         cmds.connectAttr(a + "." + ATRIB_LONGITUD, "{}.longitudes[{}]".format(n, i), force=True)
+        _anadir_desliza(a)
+        cmds.connectAttr(a + "." + ATRIB_DESLIZA, "{}.deslizan[{}]".format(n, i), force=True)
 
 
 def _crear_estructura(base, ajustes):
@@ -186,13 +196,38 @@ def _tamano_ancla(ajustes):
     return max(1.0, ajustes.get("grosor", 2.0) * 1.5)
 
 
+def _con_eje(ajustes):
+    """Ajustes completos; si no dicen el eje vertical, el de la escena."""
+    completos = dict(construir.POR_DEFECTO, **ajustes)
+    if "arriba" not in ajustes:
+        try:
+            completos["arriba"] = "z" if cmds.upAxis(query=True, axis=True).lower() == "z" else "y"
+        except (RuntimeError, AttributeError):
+            pass
+    return completos
+
+
+def alternar_gancho(anclas):
+    """Los puntos intermedios elegidos pasan a ser ganchos (el cable desliza) o vuelven a atarse."""
+    anclas = [a for a in anclas if es_ancla(a)]
+    if not anclas:
+        return None
+    _anadir_desliza(anclas[0])
+    nuevo = not cmds.getAttr(anclas[0] + "." + ATRIB_DESLIZA)
+    with Bloque():
+        for a in anclas:
+            _anadir_desliza(a)
+            cmds.setAttr(a + "." + ATRIB_DESLIZA, nuevo)
+    return nuevo
+
+
 def crear(anclajes, ajustes, base=None):
     """Crea un cable o una tubería entre ``anclajes``.
 
     ``anclajes``: lista de (posición, normal, objeto al que pegarse o None).
     Devuelve el grupo creado.
     """
-    ajustes = dict(construir.POR_DEFECTO, **ajustes)
+    ajustes = _con_eje(ajustes)
     tipo = ajustes["tipo"]
     with Bloque():
         grupo, n = _crear_estructura(base or tipo, ajustes)
@@ -209,7 +244,7 @@ def crear(anclajes, ajustes, base=None):
 
 def crear_desde_curva(curva, ajustes, base=None):
     """Cable o tubería que sigue la curva ``curva`` (transform o forma)."""
-    ajustes = dict(construir.POR_DEFECTO, **ajustes)
+    ajustes = _con_eje(ajustes)
     formas = cmds.listRelatives(curva, shapes=True, type="nurbsCurve", fullPath=True) or (
         [curva] if cmds.nodeType(curva) == "nurbsCurve" else [])
     if not formas:

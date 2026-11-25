@@ -148,6 +148,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         self.botones_editar = {}
         for i, (clave, funcion) in enumerate((("insertar_punto", self.servicio.insertar_punto),
                                               ("quitar_punto", self.servicio.quitar_puntos),
+                                              ("gancho", self.servicio.alternar_gancho),
                                               ("seleccionar_anclas", self.servicio.seleccionar_anclas),
                                               ("seleccionar_cuerpo", self.servicio.seleccionar_cuerpos),
                                               ("hornear", self._hornear),

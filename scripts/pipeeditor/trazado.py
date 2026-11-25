@@ -255,3 +255,22 @@ def marcos(puntos, normal_inicial=None):
         r = vec.unitario(vec.resta(r, vec.escala(ts[i], vec.punto(r, ts[i]))), vec.perpendicular(ts[i]))
         salida.append((ts[i], r, vec.unitario(vec.cruz(ts[i], r))))
     return salida
+
+
+def suavizar(puntos, partes=2):
+    """Curva de Catmull-Rom que pasa por los ``puntos``, con ``partes`` tramos entre cada par."""
+    n = len(puntos)
+    if n < 3 or partes < 2:
+        return list(puntos)
+    salida = [tuple(puntos[0])]
+    for i in range(n - 1):
+        p0 = puntos[i - 1] if i > 0 else vec.resta(vec.escala(puntos[0], 2.0), puntos[1])
+        p1, p2 = puntos[i], puntos[i + 1]
+        p3 = puntos[i + 2] if i + 2 < n else vec.resta(vec.escala(puntos[-1], 2.0), puntos[-2])
+        for k in range(1, partes + 1):
+            t = k / float(partes)
+            t2, t3 = t * t, t * t * t
+            salida.append(tuple(
+                0.5 * (2 * p1[c] + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2
+                       + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3) for c in range(3)))
+    return salida

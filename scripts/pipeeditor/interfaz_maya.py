@@ -130,6 +130,12 @@ class ServicioMaya(object):
         n = escena.quitar_puntos(anclas)
         return t("puntos_quitados", n=n)
 
+    def alternar_gancho(self):
+        anclas = self._anclas_seleccionadas()
+        if not anclas:
+            raise ValueError(t("falta_ancla"))
+        return t("gancho_si" if escena.alternar_gancho(anclas) else "gancho_no")
+
     def seleccionar_anclas(self):
         anclas = []
         for n in self.seleccion():
