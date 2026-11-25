@@ -223,7 +223,8 @@ def crear_desde_curva(curva, ajustes, base=None):
 def crear_desde_aristas(aristas, ajustes, base=None):
     """Convierte las aristas en una curva (que sigue viva) y crea el cable o la tubería encima."""
     with Bloque():
-        curva = cmds.polyToCurve(aristas, form=2, degree=1, conformToSmoothMeshPreview=False)[0]
+        cmds.select(aristas, replace=True)
+        curva = cmds.polyToCurve(form=2, degree=1, conformToSmoothMeshPreview=False)[0]
         grupo = crear_desde_curva(curva, ajustes, base)
         curva = cmds.parent(curva, grupo)[0]
         cmds.setAttr(curva + ".visibility", 0)

@@ -110,9 +110,12 @@ def main():
         cmds.move(250, 150, 50, mesa)
         cmds.setAttr(n + ".holgura", 1.0)
         escena.poner_apoyos([n], [mesa])
-        caja = caja_y(cuerpo)
-        comprobar(caras(cuerpo) > 100 and 150 - 1 <= caja[1] < 200,
-                  "se apoya sobre la mesa (mínimo y {:.1f})".format(caja[1]))
+        puntos = cmds.getAttr(curva + ".cv[*]")
+        encima = [p[1] for p in puntos if 170 < p[0] < 330]
+        comprobar(caras(cuerpo) > 100 and encima and min(encima) >= 155 - 0.1,
+                  "se apoya sobre la mesa (mínimo y sobre la mesa {:.1f})".format(min(encima) if encima else -1))
+        fuera = [p[1] for p in puntos if p[0] < 120 or p[0] > 380]
+        comprobar(fuera and min(fuera) >= -0.1, "y fuera de la mesa, sobre el suelo")
         escena.poner_apoyos([n], [])
         cmds.setAttr(n + ".holgura", 0.1)
 
