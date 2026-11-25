@@ -68,6 +68,12 @@ def bordes_abiertos(forma):
     return abiertas
 
 
+def caja_forma(objeto):
+    """Caja de la malla sola: la del transform incluye los anclajes que cuelgan de él."""
+    from maya import cmds
+    return cmds.exactWorldBoundingBox(cmds.listRelatives(objeto, shapes=True, fullPath=True)[0])
+
+
 def dentro_de(puntos, caja, margen=0.3):
     (x0, y0, z0, x1, y1, z1) = caja
     return [p for p in puntos if x0 + margen < p[0] < x1 - margen and y0 + margen < p[1] < y1 - margen
@@ -166,7 +172,7 @@ def main():
         comprobar(caras(cuerpo) > 100 and encima and min(encima) >= 155 - 0.1,
                   "se apoya sobre la mesa (mínimo y sobre la mesa {:.1f}, {} puntos de {})".format(
                       min(encima) if encima else -1, len(encima), len(puntos)))
-        metidos = dentro_de(puntos, cmds.exactWorldBoundingBox(mesa), margen=0.5)
+        metidos = dentro_de(puntos, caja_forma(mesa), margen=0.5)
         comprobar(not metidos, "no atraviesa la mesa ({} puntos dentro)".format(len(metidos)))
         fuera = [p[1] for p in puntos if p[0] < 120 or p[0] > 380]
         comprobar(fuera and min(fuera) >= -0.1, "y fuera de la mesa, sobre el suelo")
@@ -184,7 +190,7 @@ def main():
         nl = escena.nodo_de(lamp)
         escena.poner_apoyos([nl], [mesa2])
         pl = puntos_curva(escena.formas_de(nl)[2])
-        x0, y0, z0, x1, y1, z1 = cmds.exactWorldBoundingBox(mesa2)
+        x0, y0, z0, x1, y1, z1 = caja_forma(mesa2)
         bajo = [p for p in pl if x0 + 1 < p[0] < x1 - 1 and z0 + 1 < p[2] < z1 - 1 and 2.0 < p[1] < y1 - 0.5]
         comprobar(not bajo, "lámpara: cae por el borde de la mesa ({} puntos bajo o dentro del tablero)".format(
             len(bajo)))

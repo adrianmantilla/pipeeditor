@@ -110,6 +110,18 @@ class Reposo(unittest.TestCase):
         debajo = [p for p in r.curva if 125 < p[0] < 275 and abs(p[2]) < 55 and 2.0 < p[1] < 60]
         self.assertFalse(debajo, "hay cable bajo el tablero")
 
+    def test_cantos_de_la_mesa_sin_meterse(self):
+        # El suavizado final no debe meter el tubo en las aristas donde dobla.
+        mesa = caja((150, 145, -50), (350, 155, 150))
+        anclas = [c.Anclaje((0, 290, 0), (1, 0, 0)), c.Anclaje((500, 240, 100), (-1, 0, 0))]
+        r = c.construir({"holgura": 1.0, "grosor": 2.0, "salida": 5.0}, anclas, bajar=mesa.bajar, empujar=mesa)
+        P = np.array(r.curva)
+        dentro = np.all((P > np.array([150, 145, -50]) + 0.5) & (P < np.array([350, 155, 150]) - 0.5), axis=1)
+        self.assertFalse(dentro.any(), P[dentro][:3])
+        fuera = np.maximum(np.maximum(np.array([150, 145, -50]) - P, P - np.array([350, 155, 150])), 0.0)
+        distancia = np.sqrt((fuera ** 2).sum(axis=1))
+        self.assertGreater(distancia.min(), 0.85, "el eje pasa a menos de un radio del tablero")
+
     def test_extremo_sobre_la_mesa_cae_por_el_borde(self):
         # Lámpara en la mesa enchufada a la pared: el cable va por el tablero y
         # cae por el borde; no sube por debajo atravesándolo.

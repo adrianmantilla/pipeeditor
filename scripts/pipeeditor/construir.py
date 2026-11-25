@@ -421,7 +421,7 @@ def _camino_colgante(a, anclajes, inicio, fin, r, suelo, bajar, res, empujar=Non
         res.longitudes = largos
         for t in tramos:
             res.caida = max(res.caida, catenaria.caida(t))
-        camino = _sobre_suelo(trazado.suavizar(camino), suelo, r)
+        camino = _fuera_de_objetos(_sobre_suelo(trazado.suavizar(camino), suelo, r), empujar, r)
     else:
         camino = [c0] if salida > 0 else []
         for i, tramo in enumerate(tramos):
@@ -479,7 +479,26 @@ def _haz_suelto(a, anclajes, inicio, fin, r, suelo, bajar, empujar, res):
                                       pasos=70)
     hilos = [[tuple(float(c) for c in p) for p in x] for x in resultado]
     res.reposado = True
-    return [trazado.limpiar_repetidos(_sobre_suelo(trazado.suavizar(h), suelo, r)) for h in hilos]
+    return [trazado.limpiar_repetidos(_fuera_de_objetos(_sobre_suelo(trazado.suavizar(h), suelo, r), empujar, r))
+            for h in hilos]
+
+
+def _fuera_de_objetos(camino, empujar, r):
+    """Saca de los objetos lo que el suavizado mete en ellos (en los cantos donde el cable dobla)."""
+    if empujar is None or len(camino) < 3:
+        return camino
+    import numpy as np
+    # Más puntos donde haga falta: una cuerda larga corta la arista aunque sus extremos estén fuera.
+    paso = max(r * 1.5, 0.3)
+    denso = [camino[0]]
+    for p, q in zip(camino, camino[1:]):
+        partes = max(1, int(math.ceil(vec.distancia(p, q) / paso)))
+        denso.extend(vec.mezcla(p, q, k / float(partes)) for k in range(1, partes + 1))
+    P = np.array(denso, dtype=float)
+    for _ in range(2):
+        Q, _c = empujar(P, r)
+        P[1:-1] = np.asarray(Q, dtype=float)[1:-1]
+    return [tuple(float(c) for c in p) for p in P]
 
 
 def _sobre_suelo(camino, suelo, r):

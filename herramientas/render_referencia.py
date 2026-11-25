@@ -132,8 +132,8 @@ def luces(cmds):
     core.createOptions()
     cmds.setAttr("defaultRenderGlobals.currentRenderer", "arnold", type="string")
     cielo = cmds.shadingNode("aiSkyDomeLight", asLight=True, name="cielo")
-    cmds.setAttr(cielo + ".intensity", 0.6)
-    sol = cmds.directionalLight(name="sol", intensity=2.5)
+    cmds.setAttr(cielo + ".intensity", 0.9)
+    sol = cmds.directionalLight(name="sol", intensity=1.5)
     sol_t = cmds.listRelatives(sol, parent=True)[0]
     cmds.xform(sol_t, worldSpace=True, rotation=(-50, 30, 0))
     try:
