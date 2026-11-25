@@ -82,10 +82,11 @@ def main():
         comprobar(cmds.listRelatives(anclas[1], parent=True)[0] == poste_b, "el anclaje cuelga del poste")
 
         antes = caja_y(cuerpo)
-        cmds.move(0, 100, 0, poste_b, relative=True)
+        cmds.move(0, 200, 0, poste_b, relative=True)
         despues = caja_y(cuerpo)
-        comprobar(despues[4] > antes[4] + 50, "el cable sigue al poste al moverlo")
-        cmds.undo()
+        comprobar(despues[4] > antes[4] + 100, "el cable sigue al poste al moverlo ({:.0f} -> {:.0f})".format(
+            antes[4], despues[4]))
+        cmds.move(0, -200, 0, poste_b, relative=True)
 
         # holgura y longitud fija
         cmds.setAttr(n + ".holgura", 0.4)
@@ -110,7 +111,8 @@ def main():
         cmds.setAttr(n + ".holgura", 1.0)
         escena.poner_apoyos([n], [mesa])
         caja = caja_y(cuerpo)
-        comprobar(caja[1] >= 150 - 1, "se apoya sobre la mesa (mínimo y {:.1f})".format(caja[1]))
+        comprobar(caras(cuerpo) > 100 and 150 - 1 <= caja[1] < 200,
+                  "se apoya sobre la mesa (mínimo y {:.1f})".format(caja[1]))
         escena.poner_apoyos([n], [])
         cmds.setAttr(n + ".holgura", 0.1)
 
@@ -152,9 +154,10 @@ def main():
         comprobar(caras(escena.formas_de(escena.nodo_de(g_curva))[0]) > 100, "tubería desde una curva")
         cmds.move(0, 0, 50, curva_usuario + ".cv[1]", relative=True)
         comprobar(caras(escena.formas_de(escena.nodo_de(g_curva))[0]) > 100, "sigue a la curva al editarla")
-        plano = cmds.polyPlane(width=200, height=200, subdivisionsX=4, subdivisionsY=4, name="tejado")[0]
-        cmds.move(0, 400, 0, plano)
-        g_aristas = escena.crear_desde_aristas(["{}.e[0:3]".format(plano)], {"tipo": "tuberia", "grosor": 6.0})
+        tejado = cmds.polyCube(width=200, height=50, depth=200, name="tejado")[0]
+        cmds.move(0, 400, 0, tejado)
+        borde = cmds.ls(cmds.polyListComponentConversion(tejado + ".f[1]", toEdge=True), flatten=True)
+        g_aristas = escena.crear_desde_aristas(borde, {"tipo": "tuberia", "grosor": 6.0})
         comprobar(caras(escena.formas_de(escena.nodo_de(g_aristas))[0]) > 50, "tubería desde aristas")
 
         # --- entre dos grupos ---
@@ -206,6 +209,7 @@ def main():
             print("  - " + f)
     else:
         print("RESULTADO: OK")
+    return 1 if fallos else 0
 
 
 def escena_ejemplo(carpeta):
@@ -247,15 +251,19 @@ def escena_ejemplo(carpeta):
 
 
 if __name__ == "__main__":
+    codigo = 2
     try:
-        main()
+        codigo = main()
     except Exception:
         traceback.print_exc()
         print("RESULTADO: ERROR")
     finally:
+        sys.stdout.flush()
+        sys.stderr.flush()
         try:
             import maya.standalone
             maya.standalone.uninitialize()
         except Exception:
             pass
-        os._exit(0)
+        sys.stdout.flush()
+        os._exit(codigo)

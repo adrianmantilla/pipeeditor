@@ -256,7 +256,10 @@ def _bajar(apoyos):
         mejor = None
         origen = om.MFloatPoint(x, y, z)
         for fn, acel in apoyos:
-            golpe = fn.closestIntersection(origen, abajo, om.MSpace.kObject, 1e7, False, None, None, False, acel)
+            try:
+                golpe = fn.closestIntersection(origen, abajo, om.MSpace.kObject, 1e7, False, accelParams=acel)
+            except TypeError:  # versiones que no aceptan el argumento con nombre
+                golpe = fn.closestIntersection(origen, abajo, om.MSpace.kObject, 1e7, False)
             if golpe and golpe[2] >= 0:
                 altura = golpe[0].y
                 if mejor is None or altura > mejor:
