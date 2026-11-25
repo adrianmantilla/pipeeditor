@@ -37,10 +37,55 @@ def caras(forma):
     return cmds.polyEvaluate(forma, face=True) if forma and cmds.objExists(forma) else 0
 
 
-def puntos_curva(forma):
+def puntos_curva(forma, cuantos=400):
+    """Puntos repartidos a lo largo de la curva central (sobre la curva, no sus CV)."""
     import maya.api.OpenMaya as om
     camino = om.MSelectionList().add(forma).getDagPath(0)
-    return [(p.x, p.y, p.z) for p in om.MFnNurbsCurve(camino).cvPositions(om.MSpace.kWorld)]
+    fn = om.MFnNurbsCurve(camino)
+    largo = fn.length()
+    salida = []
+    for k in range(cuantos + 1):
+        u = fn.findParamFromLength(largo * k / float(cuantos))
+        p = fn.getPointAtParam(u, om.MSpace.kWorld)
+        salida.append((p.x, p.y, p.z))
+    return salida
+
+
+def malla_fn(forma):
+    import maya.api.OpenMaya as om
+    return om.MFnMesh(om.MSelectionList().add(forma).getDagPath(0))
+
+
+def bordes_abiertos(forma):
+    """Aristas con una sola cara: grietas que se abren al suavizar."""
+    import maya.api.OpenMaya as om
+    it = om.MItMeshEdge(om.MSelectionList().add(forma).getDagPath(0))
+    abiertas = 0
+    while not it.isDone():
+        if it.numConnectedFaces() < 2:
+            abiertas += 1
+        it.next()
+    return abiertas
+
+
+def dentro_de(puntos, caja, margen=0.3):
+    (x0, y0, z0, x1, y1, z1) = caja
+    return [p for p in puntos if x0 + margen < p[0] < x1 - margen and y0 + margen < p[1] < y1 - margen
+            and z0 + margen < p[2] < z1 - margen]
+
+
+def ms_recalculo(n, atributo="semilla"):
+    """Milisegundos que tarda el nodo en recalcular tras un cambio."""
+    import time
+    from maya import cmds
+    v = cmds.getAttr(n + "." + atributo)
+    t = time.time()
+    cmds.setAttr(n + "." + atributo, v + 1)
+    cmds.getAttr(n + ".longitudTotal")
+    cmds.polyEvaluate(cmds.listConnections(n + ".cuerpo", shapes=True)[0], face=True)
+    ms = (time.time() - t) * 1000.0
+    cmds.setAttr(n + "." + atributo, v)
+    return ms
 
 
 def caja_y(forma):
@@ -179,6 +224,10 @@ def main():
         contenedor, creados = escena.crear_entre_grupos(anclajes, {"tipo": "cable", "grosor": 1.0})
         comprobar(len(creados) == 2, "dos cables entre dos grupos")
 
+        # --- calidad de lo generado (v1.1) ---
+        pruebas_calidad(cmds, escena, materiales, n)
+        cmds.select(clear=True)
+
         # --- guardar y abrir ---
         ruta = os.path.join(temporal, "prueba_pipeeditor.ma")
         cmds.file(rename=ruta)
@@ -220,6 +269,127 @@ def main():
     else:
         print("RESULTADO: OK")
     return 1 if fallos else 0
+
+
+def pruebas_calidad(cmds, escena, materiales, n):
+    """Mide lo realista que es el resultado, no solo que exista."""
+    cuerpo, piezas, curva = escena.formas_de(n)
+    metal = escena.forma_de(n, "metal")
+    print("  -- calidad --")
+    caja_uv = cmds.polyEvaluate(piezas, boundingBox2d=True)
+    comprobar(caja_uv[0][1] - caja_uv[0][0] > 0.05, "calidad: el conector propio conserva sus UV")
+    from pipeeditor import piezas as pz
+    cmds.setAttr(n + ".conectorInicio", list(pz.CONECTORES).index("clavija"))
+    cmds.setAttr(n + ".conectorFin", list(pz.CONECTORES).index("gancho"))
+    # malla cerrada, aristas vivas con pliegue, curva cúbica
+    comprobar(bordes_abiertos(cuerpo) == 0, "calidad: el cuerpo es cerrado (se suaviza sin grietas)")
+    fn = malla_fn(cuerpo)
+    duras = sum(1 for e in range(fn.numEdges) if not fn.isEdgeSmooth(e))
+    comprobar(duras > 0, "calidad: bordes de las tapas con arista dura ({})".format(duras))
+    pliegues = cmds.polyCrease(cuerpo + ".e[*]", query=True, value=True) or []
+    comprobar(any(v > 0 for v in pliegues), "calidad: bordes con pliegue para subdividir")
+    comprobar(cmds.getAttr(curva + ".degree") == 3, "calidad: curva central cúbica")
+    # metal aparte
+    comprobar(metal and caras(metal) > 0, "calidad: las patas de la clavija van en la malla de metal")
+    comprobar(metal and materiales.de(metal) == "acero", "calidad: material del metal")
+    # UV a escala real: 1 unidad UV = 10 cm a lo largo
+    caja_uv = cmds.polyEvaluate(cuerpo, boundingBox2d=True)
+    largo = cmds.getAttr(n + ".longitudTotal")
+    comprobar(abs(caja_uv[1][1] - caja_uv[1][0] - largo / 10.0) / (largo / 10.0) < 0.05,
+              "calidad: UV a escala real ({:.1f} de V para {:.0f} cm)".format(caja_uv[1][1] - caja_uv[1][0], largo))
+    print("  info  {:.0f} polígonos por metro de cable".format(caras(cuerpo) / max(largo, 1.0) * 100.0))
+
+    # reposo en el suelo: el sobrante queda tumbado y la longitud se conserva
+    cmds.setAttr(n + ".holgura", 0.9)
+    puntos = puntos_curva(curva)
+    tumbados = [p for p in puntos if p[1] < 2.5]
+    comprobar(len(tumbados) > 40, "calidad: el sobrante queda tumbado en el suelo ({} de {} puntos)".format(
+        len(tumbados), len(puntos)))
+    comprobar(min(p[1] for p in puntos) > 0.5, "calidad: no atraviesa el suelo (mínimo {:.2f})".format(
+        min(p[1] for p in puntos)))
+    pedido = sum(cmds.getAttr(n + ".longitudesActuales") or [0.0]) + 2 * cmds.getAttr(n + ".salida")
+    real = cmds.getAttr(n + ".longitudTotal")
+    comprobar(abs(real - pedido) / pedido < 0.03, "calidad: conserva la longitud ({:.0f} de {:.0f} cm, {:+.1f} %)".format(
+        real, pedido, (real - pedido) / pedido * 100.0))
+    ms = ms_recalculo(n)
+    comprobar(ms < 1500, "calidad: recalcula el reposo en {:.0f} ms".format(ms))
+    # sin pico donde toca el suelo: giro máximo entre tramos de 2 cm
+    import math
+    peor = 0.0
+    pts = puntos_curva(curva, 600)
+    for a, b, c in zip(pts, pts[2:], pts[4:]):
+        u = [b[k] - a[k] for k in range(3)]
+        v = [c[k] - b[k] for k in range(3)]
+        lu, lv = math.sqrt(sum(x * x for x in u)), math.sqrt(sum(x * x for x in v))
+        if lu > 1e-6 and lv > 1e-6:
+            peor = max(peor, math.degrees(math.acos(max(-1, min(1, sum(u[k] * v[k] for k in range(3)) / lu / lv)))))
+    comprobar(peor < 35.0, "calidad: sin picos al tocar el suelo (giro máximo {:.0f}°)".format(peor))
+
+    # un poste en medio: antes se atravesaba por los lados
+    cmds.setAttr(n + ".holgura", 0.1)
+    columna = cmds.polyCylinder(radius=10, height=600, subdivisionsAxis=24, name="columnaEnMedio")[0]
+    medio = puntos_curva(curva)[200]
+    cmds.move(medio[0], 300, medio[2], columna)
+    caja = cmds.exactWorldBoundingBox(columna)
+    escena.poner_apoyos([n], [columna])
+    puntos = puntos_curva(curva)
+    radio_col = [math.hypot(p[0] - medio[0], p[2] - medio[2]) for p in puntos]
+    comprobar(min(radio_col) > 10.0 - 0.3, "calidad: no atraviesa un poste por el lado (distancia {:.1f})".format(
+        min(radio_col)))
+    escena.poner_apoyos([n], [])
+    cmds.delete(columna)
+    del caja
+
+    # gancho: el cable pasa por el punto sin atarse
+    nueva = escena.insertar_punto(escena.anclas_de(n)[0])
+    escena.alternar_gancho([nueva])
+    cmds.move(0, 60, 0, nueva, relative=True)
+    pos = cmds.xform(nueva, query=True, worldSpace=True, translation=True)
+    cerca = min(math.sqrt(sum((p[k] - pos[k]) ** 2 for k in range(3))) for p in puntos_curva(curva))
+    comprobar(cerca < 2.0, "calidad: el cable pasa por el gancho ({:.2f} cm)".format(cerca))
+    escena.quitar_puntos([nueva])
+
+    # haz suelto: cada cable cuelga por su cuenta sin atravesarse
+    cmds.setAttr(n + ".haz", 5)
+    cmds.setAttr(n + ".separacionBridasHaz", 0)
+    cmds.setAttr(n + ".variacion", 0.8)
+    cmds.setAttr(n + ".holgura", 0.3)
+    comprobar(bordes_abiertos(cuerpo) == 0 and caras(cuerpo) > 400, "calidad: haz suelto de 5 cables")
+    ms = ms_recalculo(n)
+    comprobar(ms < 4000, "calidad: el haz suelto recalcula en {:.0f} ms".format(ms))
+    cmds.setAttr(n + ".haz", 1)
+    cmds.setAttr(n + ".variacion", 0)
+    cmds.setAttr(n + ".holgura", 0.1)
+
+    # tuberías: rack de tres, normalizadas, esquivando una columna
+    pilar = cmds.polyCube(width=40, height=500, depth=40, name="pilar")[0]
+    cmds.move(800, 250, 600, pilar)
+    rack = escena.crear([((600, 100, 600), (1, 0, 0), None), ((1000, 100, 600), (-1, 0, 0), None)],
+                        {"tipo": "tuberia", "grosor": 6.0, "norma": "acero", "tubos": 3, "codo": "soldado",
+                         "recorrido": "esquivar", "salida": 10.0})
+    nr = escena.nodo_de(rack)
+    escena.poner_apoyos([nr], [pilar])
+    c_rack = escena.formas_de(nr)[0]
+    import maya.api.OpenMaya as om
+    vertices = [(p.x, p.y, p.z) for p in malla_fn(c_rack).getPoints(om.MSpace.kWorld)]
+    dentro = dentro_de(vertices, cmds.exactWorldBoundingBox(pilar))
+    comprobar(caras(c_rack) > 300 and not dentro, "calidad: rack de 3 tuberías que esquiva el pilar ({} vértices "
+              "dentro)".format(len(dentro)))
+    comprobar(bordes_abiertos(c_rack) == 0, "calidad: tuberías cerradas")
+    comprobar(caras(escena.formas_de(nr)[1]) > 100, "calidad: codos soldados con cordones")
+
+    # eje Z hacia arriba
+    cmds.upAxis(axis="z", rotateView=False)
+    try:
+        gz = escena.crear([((0, 2000, 300), (1, 0, 0), None), ((400, 2000, 300), (-1, 0, 0), None)],
+                          {"tipo": "cable", "holgura": 0.1, "apoyar_suelo": False})
+        nz = escena.nodo_de(gz)
+        pz = puntos_curva(escena.formas_de(nz)[2])
+        comprobar(cmds.getAttr(nz + ".arriba") == 1 and min(p[2] for p in pz) < 260
+                  and max(abs(p[1] - 2000) for p in pz) < 1.0, "calidad: con Z arriba cuelga hacia -Z")
+        escena.borrar([nz])
+    finally:
+        cmds.upAxis(axis="y", rotateView=False)
 
 
 def escena_ejemplo(carpeta):
