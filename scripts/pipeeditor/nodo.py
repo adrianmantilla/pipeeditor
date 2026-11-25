@@ -256,10 +256,17 @@ def _bajar(apoyos):
         mejor = None
         origen = om.MFloatPoint(x, y, z)
         for fn, acel in apoyos:
-            try:
-                golpe = fn.closestIntersection(origen, abajo, om.MSpace.kObject, 1e7, False, accelParams=acel)
-            except TypeError:  # versiones que no aceptan el argumento con nombre
-                golpe = fn.closestIntersection(origen, abajo, om.MSpace.kObject, 1e7, False)
+            golpe = None
+            # worldMesh trae la matriz del objeto: kWorld da posiciones de escena.
+            for espacio in (om.MSpace.kWorld, om.MSpace.kObject):
+                try:
+                    try:
+                        golpe = fn.closestIntersection(origen, abajo, espacio, 1e7, False, accelParams=acel)
+                    except TypeError:  # versiones que no aceptan el argumento con nombre
+                        golpe = fn.closestIntersection(origen, abajo, espacio, 1e7, False)
+                    break
+                except RuntimeError:
+                    golpe = None
             if golpe and golpe[2] >= 0:
                 altura = golpe[0].y
                 if mejor is None or altura > mejor:
@@ -273,7 +280,10 @@ def _cercano(apoyos):
         mejor, distancia = None, float("inf")
         punto = om.MPoint(*p)
         for fn, _acel in apoyos:
-            q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kObject)
+            try:
+                q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kWorld)
+            except RuntimeError:
+                q, n, _cara = fn.getClosestPointAndNormal(punto, om.MSpace.kObject)
             d = q.distanceTo(punto)
             if d < distancia:
                 n.normalize()
