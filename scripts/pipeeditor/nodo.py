@@ -87,6 +87,9 @@ class PipeEditorNodo(om.MPxNode):
 
     def __init__(self):
         om.MPxNode.__init__(self)
+        self._cache = {}          # último recorrido calculado (ver construir.construir)
+        self._borrador = False    # el último cálculo fue rápido, mientras se arrastraba
+        self._vigilando = False
 
     @staticmethod
     def crear():
@@ -119,6 +122,11 @@ class PipeEditorNodo(om.MPxNode):
         typ.usesArrayDataBuilder = True
         typ.disconnectBehavior = om.MFnAttribute.kDelete
         A["conectorPropio"] = typ.create("conectorPropio", "cpr", om.MFnData.kMesh)
+        # Se cambia solo para recalcular con el reposo completo al soltar el ratón.
+        A["refinar"] = num.create("refinar", "ref", om.MFnNumericData.kInt, 0)
+        num.storable = False
+        num.keyable = False
+        num.hidden = True
         # Versión de los datos con la que se creó el nodo (0 = PipeEditor 1.0): ver construir.migrar.
         A["versionDatos"] = num.create("versionDatos", "vda", om.MFnNumericData.kInt, 0)
         num.keyable = False
@@ -185,7 +193,7 @@ class PipeEditorNodo(om.MPxNode):
         if plug.isNull or om.MFnAttribute(plug.attribute()).name not in salidas:
             return None
         try:
-            res = self._calcular(datos)
+            res = self._calcular(datos, _arrastrando())
         except Exception as error:  # nunca tumbar Maya por un cable
             om.MGlobal.displayWarning("PipeEditor: {}".format(error))
             res = construir.Resultado()
@@ -207,7 +215,7 @@ class PipeEditorNodo(om.MPxNode):
             datos.setClean(A[s])
         return self
 
-    def _calcular(self, datos):
+    def _calcular(self, datos, borrador=False):
         A = PipeEditorNodo.atributos
         ajustes = {}
         for nombre, opciones in ENUMS.items():
@@ -230,6 +238,11 @@ class PipeEditorNodo(om.MPxNode):
                                               deslizan.get(indice, False)))
 
         ajustes = construir.migrar(ajustes, datos.inputValue(A["versionDatos"]).asInt())
+        # Mientras se arrastra con el ratón, un reposo más corto; al soltar, el completo.
+        self._borrador = borrador
+        if borrador:
+            ajustes["_borrador"] = True
+            self._vigilar_al_soltar()
         ruta, lineal = _ruta(datos.inputValue(A["ruta"]), ajustes["segmentos_metro"])
         apoyos = []
         arr = datos.inputArrayValue(A["apoyos"])
@@ -243,13 +256,65 @@ class PipeEditorNodo(om.MPxNode):
         h = datos.inputValue(A["conectorPropio"]).asMesh()
         if not h.isNull():
             propio = _malla_python(om.MFnMesh(h))
+        self._cache["firma_apoyos"] = _firma(apoyos, propio)
         eje = 2 if ajustes["arriba"] == "z" else 1
         bajar = _bajar(apoyos, eje) if apoyos else None
         cercano = _cercano(apoyos) if apoyos else None
         empujar = _empujar(apoyos) if apoyos and ajustes["tipo"] == "cable" else None
         obstaculos = _cajas(apoyos) if apoyos and ajustes["tipo"] == "tuberia" else []
         return construir.construir(ajustes, anclajes, ruta=ruta, ruta_lineal=lineal, bajar=bajar,
-                                   cercano=cercano, malla_propia=propio, empujar=empujar, obstaculos=obstaculos)
+                                   cercano=cercano, malla_propia=propio, empujar=empujar, obstaculos=obstaculos,
+                                   cache=self._cache)
+
+    def _vigilar_al_soltar(self):
+        """Cuando se suelta el ratón, vuelve a calcular con el reposo completo."""
+        if self._vigilando:
+            return
+        self._vigilando = True
+        import threading
+        import maya.utils
+
+        def comprobar():
+            if _arrastrando():
+                threading.Timer(0.2, lambda: maya.utils.executeDeferred(comprobar)).start()
+                return
+            self._vigilando = False
+            if self._borrador:
+                try:
+                    plug = om.MPlug(self.thisMObject(), PipeEditorNodo.atributos["refinar"])
+                    plug.setInt(plug.asInt() + 1)
+                except RuntimeError:  # el nodo ya no existe
+                    pass
+        threading.Timer(0.2, lambda: maya.utils.executeDeferred(comprobar)).start()
+
+
+def _arrastrando():
+    """¿Hay un botón del ratón pulsado en Maya con interfaz? (moviendo un anclaje, el tiempo...)."""
+    if om.MGlobal.mayaState() != om.MGlobal.kInteractive:
+        return False
+    try:
+        from pipeeditor.qt import QtCore, QtWidgets
+        app = QtWidgets.QApplication.instance()
+        return bool(app) and app.mouseButtons() != QtCore.Qt.NoButton
+    except Exception:
+        return False
+
+
+def _firma(apoyos, propio):
+    """Lo que identifica la forma y posición de los apoyos y del conector propio (para la caché)."""
+    import hashlib
+    h = hashlib.sha1()
+    for fn, _acel in apoyos:
+        try:
+            pts = fn.getPoints(om.MSpace.kWorld)
+        except RuntimeError:
+            pts = fn.getPoints()
+        paso = max(1, len(pts) // 2000)  # una muestra basta: mover o deformar el apoyo la cambia
+        h.update(repr((len(pts), [(round(pts[i].x, 3), round(pts[i].y, 3), round(pts[i].z, 3))
+                                  for i in range(0, len(pts), paso)])).encode())
+    if propio is not None:
+        h.update(repr(propio.vertices).encode())
+    return h.hexdigest()
 
 
 def _valores_array(arr, leer):

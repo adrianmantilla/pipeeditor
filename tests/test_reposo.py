@@ -218,3 +218,30 @@ class Ondulacion(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(np is None, "sin numpy")
+class Cache(unittest.TestCase):
+    def test_reutiliza_el_reposo_si_no_cambia_el_recorrido(self):
+        import time
+        cache = {"firma_apoyos": "nada"}
+        a = {"holgura": 0.6, "salida": 0.0}
+        t = time.time()
+        r1 = c.construir(a, A, cache=cache)
+        lento = time.time() - t
+        t = time.time()
+        r2 = c.construir(dict(a, lados=12, segmentos_metro=30), A, cache=cache)
+        rapido = time.time() - t
+        self.assertTrue(r2.reposado)
+        self.assertEqual(r1.longitudes, r2.longitudes)
+        self.assertLess(rapido, lento * 0.5)
+        self.assertNotEqual(r1.cuerpo.num_caras, r2.cuerpo.num_caras)  # la malla sí cambia
+
+    def test_recalcula_si_cambia_algo_del_recorrido(self):
+        cache = {"firma_apoyos": "nada"}
+        r1 = c.construir({"holgura": 0.6, "salida": 0.0}, A, cache=cache)
+        r2 = c.construir({"holgura": 0.7, "salida": 0.0}, A, cache=cache)
+        self.assertNotEqual(r1.longitudes, r2.longitudes)
+        cache["firma_apoyos"] = "otra mesa"
+        r3 = c.construir({"holgura": 0.7, "salida": 0.0}, A, cache=cache)
+        self.assertEqual(r2.longitudes, r3.longitudes)

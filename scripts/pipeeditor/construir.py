@@ -135,7 +135,7 @@ def ajustes(**cambios):
 
 
 def construir(a, anclajes=(), ruta=None, ruta_lineal=False, bajar=None, cercano=None, malla_propia=None,
-              empujar=None, obstaculos=()):
+              empujar=None, obstaculos=(), cache=None):
     """Devuelve un ``Resultado``.
 
     ``anclajes``: lista de ``Anclaje`` (al menos dos), o vacía si hay ``ruta``.
@@ -147,6 +147,9 @@ def construir(a, anclajes=(), ruta=None, ruta_lineal=False, bajar=None, cercano=
     ``P`` (N×3); devuelve (P corregido, máscara de contacto). Ver ``reposo``.
     ``obstaculos``: cajas (mínimo, máximo) de los objetos que una tubería con
     recorrido «esquivar» no debe atravesar.
+    ``cache``: diccionario que guarda el último recorrido de un cable (con
+    ``firma_apoyos`` = lo que identifica los objetos de apoyo); si solo cambian
+    ajustes que no lo mueven, no se vuelve a calcular el reposo.
 
     Con ``arriba = "z"`` todo llega y sale en coordenadas de la escena; por
     dentro se trabaja siempre con Y hacia arriba.
@@ -154,10 +157,10 @@ def construir(a, anclajes=(), ruta=None, ruta_lineal=False, bajar=None, cercano=
     a = ajustes(**a)
     if a["arriba"] == "z":
         return _con_z_arriba(a, list(anclajes), ruta, ruta_lineal, bajar, cercano, malla_propia, empujar,
-                             obstaculos)
+                             obstaculos, cache)
     if a["tipo"] == "tuberia":
         return _tuberia(a, list(anclajes), ruta, ruta_lineal, cercano, obstaculos)
-    return _cable(a, list(anclajes), ruta, ruta_lineal, bajar, malla_propia, empujar)
+    return _cable(a, list(anclajes), ruta, ruta_lineal, bajar, malla_propia, empujar, cache)
 
 
 # --- eje vertical Z -------------------------------------------------------------------
@@ -170,7 +173,8 @@ def _a_escena(p):
     return (p[0], -p[2], p[1])
 
 
-def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, empujar, obstaculos=()):
+def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, empujar, obstaculos=(),
+                  cache=None):
     b = dict(a, arriba="y")
     anclajes = [Anclaje(_a_interno(x.posicion), _a_interno(x.normal), x.factor, x.longitud, x.desliza)
                 for x in anclajes]
@@ -199,7 +203,7 @@ def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, 
     for lo, hi in obstaculos:
         u, v = _a_interno(lo), _a_interno(hi)
         cajas.append((tuple(min(u[k], v[k]) for k in range(3)), tuple(max(u[k], v[k]) for k in range(3))))
-    res = construir(b, anclajes, ruta, ruta_lineal, bajar_i, cercano_i, malla_propia, empujar_i, cajas)
+    res = construir(b, anclajes, ruta, ruta_lineal, bajar_i, cercano_i, malla_propia, empujar_i, cajas, cache)
     res.cuerpo.vertices = [_a_escena(p) for p in res.cuerpo.vertices]
     res.piezas.vertices = [_a_escena(p) for p in res.piezas.vertices]
     res.curva = [_a_escena(p) for p in res.curva]
@@ -213,7 +217,40 @@ def _segmentos(longitud, a):
     return max(8, int(math.ceil(longitud / 100.0 * a["segmentos_metro"])))
 
 
-def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None):
+# Ajustes que no cambian por dónde va el cable: si solo cambian estos, se
+# reutiliza el recorrido ya calculado (el reposo es lo que más tarda).
+_NO_CAMBIAN_RECORRIDO = ("lados", "perfil_cable", "torsion", "pieza", "separacion_piezas", "segmentos_metro",
+                         "perfil_tuberia", "pared", "extremos", "separacion_bridas", "separacion_soportes",
+                         "soportes_auto", "alcance_soportes", "codo", "norma", "tubos", "separacion_tubos",
+                         "radio_codo", "recorrido")
+
+
+def _clave(a, anclajes, cache):
+    ajustes_ = tuple(sorted((k, v) for k, v in a.items() if k not in _NO_CAMBIAN_RECORRIDO))
+    puntos = tuple((tuple(x.posicion), tuple(x.normal), x.factor, x.longitud, x.desliza) for x in anclajes)
+    return (ajustes_, puntos, cache.get("firma_apoyos"))
+
+
+def _de_cache(cache, a, anclajes, res):
+    if cache is None or cache.get("clave") != _clave(a, anclajes, cache):
+        return False
+    for k, v in cache["res"].items():
+        setattr(res, k, list(v) if isinstance(v, list) else v)
+    res.hilos = [list(h) for h in cache["hilos"]]
+    return True
+
+
+def _a_cache(cache, a, anclajes, res, camino, marco_ini, marco_fin):
+    if cache is None:
+        return
+    cache["clave"] = _clave(a, anclajes, cache)
+    cache["camino"], cache["marco_ini"], cache["marco_fin"] = camino, marco_ini, marco_fin
+    cache["hilos"] = [list(h) for h in res.hilos]
+    cache["res"] = {"reposado": res.reposado, "longitudes": list(res.longitudes), "caida": res.caida,
+                    "tensos": res.tensos}
+
+
+def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None, cache=None):
     res = Resultado()
     r = max(a["grosor"], 1e-4) / 2.0
     cantidad = max(1, int(a["haz"]))
@@ -234,14 +271,18 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None):
         marco_ini = vec.marco_desde_eje(vec.resta(camino[0], vec.escala(t0, inicio.largo)), t0)
         marco_fin = vec.marco_desde_eje(vec.resta(camino[-1], vec.escala(t1, fin.largo)), t1)
         res.longitudes = [vec.longitud_polilinea(camino)]
+    elif len(anclajes) >= 2 and _de_cache(cache, a, anclajes, res):
+        camino, marco_ini, marco_fin = cache["camino"], cache["marco_ini"], cache["marco_fin"]
     elif len(anclajes) >= 2 and suelto:
         res.hilos = _haz_suelto(a, anclajes, inicio, fin, r, suelo, bajar, empujar, res)
         camino = res.hilos[0]
         marco_ini = vec.marco_desde_eje(anclajes[0].posicion, anclajes[0].normal)
         marco_fin = vec.marco_desde_eje(anclajes[-1].posicion, anclajes[-1].normal)
+        _a_cache(cache, a, anclajes, res, camino, marco_ini, marco_fin)
     elif len(anclajes) >= 2:
         camino, marco_ini, marco_fin = _camino_colgante(a, anclajes, inicio, fin, r_total, suelo, bajar, res,
                                                         empujar)
+        _a_cache(cache, a, anclajes, res, camino, marco_ini, marco_fin)
     else:
         return res
 
@@ -380,6 +421,8 @@ def _reposar(a, anclajes, tramos, largos, c0, c1, salida, r, suelo, empujar, sem
              pasos=110):
     """Reposo de un cable a partir de sus catenarias apoyadas."""
     cadena = _cadena(a, anclajes, tramos, largos, c0, c1, salida, r, semilla, contactos)
+    if a.get("_borrador"):
+        pasos = max(25, pasos // 3)
     x = reposo.reposar(cadena, r, suelo=suelo, empujar=empujar, rigidez=a["rigidez"], pasos=pasos)
     return [tuple(float(c) for c in p) for p in x]
 
@@ -542,7 +585,7 @@ def _haz_suelto(a, anclajes, inicio, fin, r, suelo, bajar, empujar, res):
         cadenas.append(reposo.Cadena(puntos, rest, centro.fijos, [vec.suma(g, o) for g in centro.ganchos]))
     # Todos a la vez, sin atravesarse entre sí.
     resultado = reposo.reposar_varias(cadenas, r * 1.02, suelo=suelo, empujar=empujar, rigidez=a["rigidez"],
-                                      pasos=70)
+                                      pasos=25 if a.get("_borrador") else 70)
     hilos = [[tuple(float(c) for c in p) for p in x] for x in resultado]
     res.reposado = True
     return [trazado.limpiar_repetidos(_fuera_de_objetos(_sobre_suelo(trazado.suavizar(h), suelo, r), empujar, r))
