@@ -110,6 +110,18 @@ class Reposo(unittest.TestCase):
         debajo = [p for p in r.curva if 125 < p[0] < 275 and abs(p[2]) < 55 and 2.0 < p[1] < 60]
         self.assertFalse(debajo, "hay cable bajo el tablero")
 
+    def test_extremo_sobre_la_mesa_cae_por_el_borde(self):
+        # Lámpara en la mesa enchufada a la pared: el cable va por el tablero y
+        # cae por el borde; no sube por debajo atravesándolo.
+        mesa = caja((-310, 72, -55), (-90, 80, 55))
+        anclas = [c.Anclaje((-520, 30, -389), (0, 0, 1)), c.Anclaje((-170, 80.5, 10), (0, 1, 0))]
+        r = c.construir({"holgura": 0.9, "grosor": 0.7, "rigidez": 0.15, "ondulacion": 0.4, "semilla": 3},
+                        anclas, bajar=mesa.bajar, empujar=mesa)
+        P = np.array(r.curva)
+        dentro = (P[:, 0] > -309) & (P[:, 0] < -91) & (np.abs(P[:, 2]) < 54) & (P[:, 1] > 2.0) & (P[:, 1] < 79.5)
+        self.assertFalse(dentro.any(), P[dentro][:5])
+        self.assertGreater(int(((P[:, 1] > 80) & (P[:, 1] < 81.5)).sum()), 10)  # tumbado sobre el tablero
+
     def test_suelo_pocas_curvas_amplias(self):
         # El sobrante en el suelo: pocas curvas grandes, no un muelle.
         r = c.construir({"holgura": 0.6, "salida": 0.0, "grosor": 0.7, "rigidez": 0.15}, A)

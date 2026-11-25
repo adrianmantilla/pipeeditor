@@ -46,8 +46,12 @@ class Cadena(object):
 
 
 def radio_minimo(radio, rigidez):
-    """Radio de curvatura mínimo del cable: de 1 a 31 veces su radio."""
-    return radio * (1.0 + 30.0 * max(0.0, min(1.0, rigidez)))
+    """Radio de curvatura mínimo del cable: de 2 a 62 veces su radio.
+
+    Con la rigidez por defecto (0,3), unas 20 veces el radio: lo que aguanta
+    un cable flexible normal sin forzarlo.
+    """
+    return radio * (2.0 + 60.0 * max(0.0, min(1.0, rigidez)))
 
 
 def reposar(cadena, radio, suelo=None, empujar=None, rigidez=0.3, pasos=110, iteraciones=12, friccion=0.7):
@@ -105,7 +109,7 @@ def reposar_varias(cadenas, radio, suelo=None, empujar=None, rigidez=0.3, pasos=
         dmin = None
     varias = len(cadenas) > 1
     banda = (tamanos[0], len(cadenas)) if varias and len(set(tamanos)) == 1 else None
-    minimo = 2.0 * radio
+    minimo = 2.0 * radio * 1.08  # los puntos van separados: entre ellos, los tramos se acercan algo más
     pares = np.arange(0, n - 1, 2), np.arange(1, n - 1, 2)
     xp = x.copy()
 
@@ -154,6 +158,14 @@ def reposar_varias(cadenas, radio, suelo=None, empujar=None, rigidez=0.3, pasos=
         cerca = _parejas(x, ids, minimo * 1.6, banda) if varias else None
         for _ in range(iteraciones):
             restricciones(cerca)
+    if varias:
+        # Lo último, que no se atraviesen (aunque estire un pelo la flexión).
+        cerca = _parejas(x, ids, minimo * 1.6, banda)
+        for _ in range(4):
+            _separar_entre(x, cerca[0], cerca[1], minimo, peso)
+        if suelo is not None:
+            abajo = (x[:, 1] < suelo + radio) & (peso > 0)
+            x[abajo, 1] = suelo + radio
     if empujar is not None:
         x2, _c = empujar(x, radio, antes)
         x2 = np.asarray(x2, dtype=float)

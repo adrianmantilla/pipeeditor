@@ -98,3 +98,67 @@ class Recorridos(unittest.TestCase):
         radios = [rr[1] for _p, rr in caminos]
         self.assertAlmostEqual(radios[0] - radios[1], radios[1] - radios[2])
         self.assertAlmostEqual(abs(radios[0] - radios[1]), 10.0)
+
+
+class Pegadas(unittest.TestCase):
+    """Las tuberías van junto a las paredes, como en una instalación real."""
+
+    PARED = ((-700, 0, -410), (700, 500, -390))
+    PILAR = ((305, 0, -355), (355, 500, -305))
+    ANCLAS = [c.Anclaje((-600, 380, -390), (0, 0, 1)), c.Anclaje((600, 380, -390), (0, 0, 1))]
+
+    def test_rack_rodea_el_pilar_sin_separarse_de_la_pared(self):
+        r = c.construir({"tipo": "tuberia", "tubos": 3, "grosor": 6.0, "separacion_tubos": 12.0,
+                         "recorrido": "esquivar", "salida": 25.0}, self.ANCLAS, obstaculos=[self.PARED, self.PILAR])
+        curva = trazado.remuestrear(r.curva, 5.0)
+        lejos = [p for p in curva if p[0] < 200 or p[0] > 460]
+        self.assertTrue(lejos)
+        self.assertLess(max(p[2] for p in lejos), -360 + 1.0, "se separa de la pared lejos del pilar")
+        cerca = [p for p in curva if 320 < p[0] < 340]
+        self.assertGreater(min(p[2] for p in cerca), -305)  # por delante del pilar
+
+    def test_rack_apilado_a_lo_largo_de_la_pared(self):
+        r = c.construir({"tipo": "tuberia", "tubos": 3, "grosor": 6.0, "separacion_tubos": 12.0,
+                         "recorrido": "z", "salida": 25.0}, self.ANCLAS)
+        ys = [p[1] for p in r.cuerpo.vertices]
+        zs = [p[2] for p in r.cuerpo.vertices if -582 < p[0] < 582]
+        self.assertGreater(max(ys) - min(ys), 24.0)       # una encima de otra
+        self.assertLess(max(zs) - min(zs), 7.0)    # no se tapan de frente
+
+    def test_soportes_en_todo_el_rack(self):
+        def cercano(p, t):
+            return (p[0], p[1], -390.0), (0.0, 0.0, 1.0)
+        r = c.construir({"tipo": "tuberia", "tubos": 3, "grosor": 6.0, "separacion_tubos": 12.0,
+                         "recorrido": "esquivar", "salida": 25.0, "soportes_auto": True},
+                        self.ANCLAS, cercano=cercano, obstaculos=[self.PARED, self.PILAR])
+        self.assertGreater(r.piezas.num_caras, 0)
+
+    def test_pared_a_suelo_baja_por_la_pared(self):
+        anclas = [c.Anclaje((450, 300, -390), (0, 0, 1)), c.Anclaje((620, 0, -200), (0, 1, 0))]
+        r = c.construir({"tipo": "tuberia", "grosor": 2.2, "recorrido": "pegado"}, anclas)
+        esquinas = trazado.limpiar(r.curva)
+        # nada flota en medio de la habitación: o junto a la pared o junto al suelo
+        for p in r.curva:
+            self.assertTrue(p[2] < -380 or p[1] < 10, p)
+        self.assertGreater(len(esquinas), 3)
+
+    def test_normal_plano(self):
+        self.assertEqual(trazado.normal_plano([(0, 0, 0), (1, 0, 0), (1, 0, 1)]), (0.0, -1.0, 0.0))
+        self.assertIsNone(trazado.normal_plano([(0, 0, 0), (1, 0, 0), (1, 1, 0), (1, 1, 1)]))
+
+
+class Conectores(unittest.TestCase):
+    def test_grillete_con_orejeta_y_guardacabos(self):
+        from pipeeditor import piezas
+        g = piezas.conector("grillete", 2.0)
+        self.assertAlmostEqual(g.largo, 16.0)
+        self.assertGreater(g.malla.separar(ml.METAL).num_caras, 100)  # todo de metal
+        _lo, hi = g.malla.caja()
+        self.assertGreaterEqual(hi[1], g.largo)  # la cuerda empieza en el guardacabos
+
+    def test_aislador_de_porcelana_con_perno(self):
+        from pipeeditor import piezas
+        a = piezas.conector("aislador", 0.8)
+        self.assertGreater(a.malla.separar(0).num_caras, 50)        # porcelana
+        self.assertGreater(a.malla.separar(ml.METAL).num_caras, 5)  # perno
+        self.assertGreater(a.largo, 5.0)  # tamaño real aunque el cable sea fino

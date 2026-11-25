@@ -10,7 +10,7 @@ import math
 from pipeeditor import malla as ml
 from pipeeditor import vec
 
-CONECTORES = ("ninguno", "clavija", "jack", "terminal", "gancho", "grillete", "propio")
+CONECTORES = ("ninguno", "clavija", "jack", "terminal", "gancho", "grillete", "propio", "aislador")
 PIEZAS_CABLE = ("ninguna", "brida", "anillo", "etiqueta")
 EXTREMOS_TUBERIA = ("abiertos", "tapon", "brida")
 
@@ -52,12 +52,31 @@ def conector(tipo, r, propia=None):
         m.anadir(ml.metal(ml.cilindro(0.6 * r, 0.0, 3.5 * r, 8)))
         return Conector(m, 3.5 * r)
     if tipo == "grillete":
-        arco = ml.toro(2.0 * r, 0.55 * r, 12, 8, arco=math.pi, inicio=0.0)
-        arco = ml.girada(arco, (1, 0, 0), -math.pi / 2)
-        m.anadir(ml.metal(arco))
-        perno = ml.girada(ml.cilindro(0.6 * r, -2.6 * r, 2.6 * r, 8), (0, 0, 1), math.pi / 2)
-        m.anadir(ml.metal(perno))
-        return Conector(m, 2.6 * r)
+        # Orejeta en la superficie, grillete en D con su perno y guardacabos
+        # donde se ata la cuerda (el ojo de la cuerda abraza el grillete).
+        m.anadir(ml.metal(ml.caja(0.55 * r, 3.0 * r, 3.4 * r, centro=(0.0, 1.5 * r, 0.0))))
+        m.anadir(ml.metal(ml.caja(2.4 * r, 0.35 * r, 4.2 * r, centro=(0.0, 0.175 * r, 0.0))))
+        perno = ml.girada(ml.cilindro(0.42 * r, -1.75 * r, 1.75 * r, 8), (0, 0, 1), math.pi / 2)
+        m.anadir(ml.metal(ml.movida(perno, (0.0, 2.2 * r, 0.0))))
+        for lado in (-1, 1):
+            m.anadir(ml.metal(ml.cilindro(0.42 * r, 2.2 * r, 5.0 * r, 8, desplazamiento=(lado * 1.1 * r, 0.0))))
+            m.anadir(ml.metal(ml.cilindro(0.62 * r, 1.95 * r, 2.45 * r, 8, desplazamiento=(lado * 1.6 * r, 0.0))))
+        arco = ml.girada(ml.toro(1.1 * r, 0.42 * r, 12, 8, arco=math.pi, inicio=0.0), (1, 0, 0), -math.pi / 2)
+        m.anadir(ml.metal(ml.movida(arco, (0.0, 5.0 * r, 0.0))))
+        ojo = ml.girada(ml.toro(1.3 * r, 0.3 * r, 16, 6), (0, 0, 1), math.pi / 2)
+        m.anadir(ml.metal(ml.movida(ojo, (0.0, 6.7 * r, 0.0))))
+        return Conector(m, 8.0 * r)
+    if tipo == "aislador":
+        # Aislador de porcelana sobre su perno; el cable se ata arriba.
+        R = max(4.0 * r, 4.0)
+        m.anadir(ml.metal(ml.cilindro(0.18 * R, 0.0, 0.9 * R, 8)))
+        y = 0.9 * R
+        for k in range(3):
+            m.anadir(ml.cilindro(R * (1.0 - 0.12 * k), y, y + 0.18 * R, 18, radio_final=R * 0.55))
+            m.anadir(ml.cilindro(R * 0.45, y + 0.18 * R, y + 0.42 * R, 12))
+            y += 0.42 * R
+        m.anadir(ml.cilindro(R * 0.5, y, y + 0.35 * R, 12, radio_final=R * 0.38))
+        return Conector(m, y + 0.35 * R)
     if tipo == "propio" and propia is not None and not propia.vacia():
         _minimo, maximo = propia.caja()
         return Conector(propia, max(0.0, maximo[1]))

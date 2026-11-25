@@ -90,16 +90,17 @@ def construir_escena(cmds, escena):
     # Cuerda de puerto entre los dos postes, con grillete.
     crear(cmds, escena, [((150, 270, 128), (1, 0, 0), postes[0]), ((520, 230, 128), (-1, 0, 0), postes[1])],
           {"tipo": "cable", "perfil_cable": "trenzado", "grosor": 4.0, "holgura": 0.12, "lados": 8,
-           "conector_fin": "grillete", "material_cuerpo": "canamo", "material_piezas": "oxido",
-           "material_metal": "oxido"},
+           "conector_fin": "grillete", "material_cuerpo": "canamo", "material_piezas": "acero_galvanizado",
+           "material_metal": "acero_galvanizado"},
           {"rigidez": 0.1})
     # Haz de cables sueltos del poste al suelo.
     crear(cmds, escena, [((150, 200, 128), (0, 0, 1), postes[0]), ((260, 1.0, 380), (0, 0, 1), None)],
           {"tipo": "cable", "grosor": 1.2, "haz": 5, "holgura": 0.45, "material_cuerpo": "goma_negra"},
           {"variacion": 0.7, "rigidez": 0.35, "semilla": 2})
-    # Tendido eléctrico entre lo alto de los postes.
-    crear(cmds, escena, [((150, 295, 120), (0, 1, 0), postes[0]), ((520, 295, 120), (0, 1, 0), postes[1])],
-          {"tipo": "cable", "grosor": 1.6, "holgura": 0.03, "salida": 0.0})
+    # Tendido eléctrico entre lo alto de los postes, sobre aisladores.
+    crear(cmds, escena, [((150, 300, 120), (0, 1, 0), postes[0]), ((520, 300, 120), (0, 1, 0), postes[1])],
+          {"tipo": "cable", "grosor": 1.6, "holgura": 0.03, "salida": 0.0, "conector_inicio": "aislador",
+           "conector_fin": "aislador", "material_piezas": "pvc_blanco", "material_metal": "acero_galvanizado"})
     # Rack de tres tuberías de acero por la pared, que esquiva el pilar.
     crear(cmds, escena, [((-600, 380, -385), (0, 0, 1), pared), ((600, 380, -385), (0, 0, 1), pared)],
           {"tipo": "tuberia", "grosor": 6.03, "material_cuerpo": "hierro_pintado",

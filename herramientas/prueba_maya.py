@@ -173,6 +173,23 @@ def main():
         escena.poner_apoyos([n], [])
         cmds.setAttr(n + ".holgura", 0.1)
 
+        # lámpara sobre la mesa enchufada a la pared: cae por el borde, no sube por debajo del tablero
+        mesa2 = cmds.polyCube(width=220, height=8, depth=110, name="mesaLampara")[0]
+        cmds.move(-200, 76, 600, mesa2)
+        enchufe = cmds.polyCube(width=300, height=200, depth=10, name="paredLampara")[0]
+        cmds.move(-500, 100, 205, enchufe)
+        lamp = escena.crear([((-520, 30, 210.5), (0, 0, 1), enchufe), ((-170, 80.5, 610), (0, 1, 0), mesa2)],
+                            {"tipo": "cable", "perfil_cable": "doble", "grosor": 0.7, "holgura": 0.9,
+                             "conector_inicio": "clavija"})
+        nl = escena.nodo_de(lamp)
+        escena.poner_apoyos([nl], [mesa2])
+        pl = puntos_curva(escena.formas_de(nl)[2])
+        x0, y0, z0, x1, y1, z1 = cmds.exactWorldBoundingBox(mesa2)
+        bajo = [p for p in pl if x0 + 1 < p[0] < x1 - 1 and z0 + 1 < p[2] < z1 - 1 and 2.0 < p[1] < y1 - 0.5]
+        comprobar(not bajo, "lámpara: cae por el borde de la mesa ({} puntos bajo o dentro del tablero)".format(
+            len(bajo)))
+        cmds.delete(lamp, mesa2, enchufe)
+
         # puntos intermedios
         nueva = escena.insertar_punto(anclas[0])
         comprobar(len(escena.anclas_de(n)) == 3, "insertar un punto")

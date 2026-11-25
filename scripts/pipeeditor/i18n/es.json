@@ -84,7 +84,7 @@
   "campo_altura_suelo": "Altura del suelo",
   "campo_altura_suelo_ayuda": "Altura del plano del suelo (normalmente 0).",
   "campo_recorrido": "Recorrido",
-  "campo_recorrido_ayuda": "Cómo va de un punto a otro: en Z (mitad, giro, mitad), en L (primero el eje más largo), en línea recta o esquivando los objetos de apoyo con los mínimos codos.",
+  "campo_recorrido_ayuda": "Cómo va de un punto a otro: junto a las superficies (de una pared al suelo baja por la pared y sigue por el suelo, donde se pueden poner soportes), en Z (mitad, giro, mitad), en L (primero el eje más largo), en línea recta o esquivando los objetos de apoyo con los mínimos codos, sin separarse de la pared más de lo necesario.",
   "campo_radio_codo": "Radio del codo",
   "campo_radio_codo_ayuda": "Radio de los codos, en diámetros de la tubería. 0 deja esquinas en ángulo.",
   "campo_codo": "Codos",
@@ -234,5 +234,7 @@
   "campo_tubos": "Tuberías en paralelo",
   "campo_tubos_ayuda": "Varias tuberías juntas, como en un rack: van en fila, con la misma separación y con los codos concéntricos.",
   "campo_separacion_tubos": "Separación entre tuberías",
-  "campo_separacion_tubos_ayuda": "Distancia entre los ejes de dos tuberías vecinas. 0 = automática (un poco más que su grosor)."
+  "campo_separacion_tubos_ayuda": "Distancia entre los ejes de dos tuberías vecinas. 0 = automática (un poco más que su grosor).",
+  "opcion_recorrido_pegado": "Junto a las superficies",
+  "opcion_conector_aislador": "Aislador"
 }

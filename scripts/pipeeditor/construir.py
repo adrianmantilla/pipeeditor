@@ -69,7 +69,7 @@ POR_DEFECTO = {
     # tuberías
     "perfil_tuberia": "redonda",
     "norma": "libre",            # medidas normalizadas: libre, acero (DN) o cobre
-    "recorrido": "z",
+    "recorrido": "pegado",      # junto a las paredes y el suelo de los anclajes
     "tubos": 1,                  # varias tuberías en paralelo (rack)
     "separacion_tubos": 0.0,     # entre ejes; 0 = automática
     "radio_codo": 1.5,           # en diámetros de la tubería (1,5 = codo de radio largo)
@@ -288,17 +288,65 @@ def _catenarias(a, anclajes, paradas, r, suelo, bajar, res, factor=1.0, contar=T
             res.tensos += 1
         libre = catenaria.puntos(p, q, largo, _segmentos(largo, a))
         tramo = apoyo.apoyar_tramo(libre, r, suelo, bajar)
-        cambiados = [abs(u[1] - v[1]) > 1e-9 for u, v in zip(libre, tramo)]
-        if any(cambiados):
+        if any(abs(u[1] - v[1]) > 1e-9 for u, v in zip(libre, tramo)):
             toca = True
+        # Extremo apoyado en una mesa: el cable va por encima hasta el borde y
+        # cae por él (si no, el reposo empieza con el cable bajo el tablero).
+        bajo = min(v[1] for v in libre)
+        antes = _por_el_borde(p, q, r, suelo, bajar, bajo)
+        despues = _por_el_borde(q, p, r, suelo, bajar, bajo)
+        if antes or despues:
+            toca = True
+            a0 = antes[-1] if antes else p
+            a1 = despues[-1] if despues else q
+            resto = largo - vec.longitud_polilinea(antes) - vec.longitud_polilinea(despues)
+            resto = max(resto, vec.distancia(a0, a1) * 1.01)
+            medio = apoyo.apoyar_tramo(catenaria.puntos(a0, a1, resto, _segmentos(resto, a)), r, suelo, bajar)
+            tramo = (antes or [p]) + medio[1:-1] + list(reversed(despues or [q]))
         # Solo lo tumbado en el suelo recibe las curvas del sobrante; sobre una
         # mesa, el sobrante cae por los bordes con el reposo.
-        apoyados = [c and suelo is not None and v[1] <= suelo + r + 1e-6 for c, v in zip(cambiados, tramo)]
+        apoyados = [suelo is not None and v[1] <= suelo + r + 1e-6 for v in tramo]
         tramos.append(tramo)
         largos.append(largo)
         contactos.append(apoyados)
     _catenarias.contactos = contactos
     return tramos, largos, toca
+
+
+def _por_el_borde(p, otro, r, suelo, bajar, bajo):
+    """Camino sobre la superficie en la que se apoya ``p`` hasta su borde, hacia ``otro``.
+
+    Devuelve [] si ``p`` no está sobre una mesa (o algo elevado) o si el cable
+    no tiene que bajar de ella.
+    """
+    if bajar is None:
+        return []
+    h = bajar(p[0], p[1], p[2])
+    if h is None or (suelo is not None and h <= suelo + 2.0 * r) or p[1] - h > 30.0 or bajo >= h - r:
+        return []
+    d = (otro[0] - p[0], 0.0, otro[2] - p[2])
+    largo = math.hypot(d[0], d[2])
+    if largo < 1e-6:
+        return []
+    d = (d[0] / largo, 0.0, d[2] / largo)
+    paso = max(r, 1.0)
+    t = 0.0
+    while t < largo:
+        t += paso
+        hh = bajar(p[0] + d[0] * t, p[1], p[2] + d[2] * t)
+        if hh is None or hh < h - max(2.0 * r, 1.0):
+            break
+    else:
+        return []
+    camino = [tuple(p)]
+    y = h + r
+    partes = max(1, int(t / max(paso * 4.0, 5.0)))
+    for k in range(1, partes + 1):
+        u = (t - paso) * k / float(partes)
+        camino.append((p[0] + d[0] * u, y, p[2] + d[2] * u))
+    fuera = t + 2.0 * r
+    camino.append((p[0] + d[0] * fuera, y, p[2] + d[2] * fuera))
+    return camino
 
 
 def _toca_objetos(empujar, tramos, r):
@@ -485,13 +533,23 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano, obstaculos=()):
                     tramo = trazado.recorrido_ortogonal([p, q], "z")
                 medio.extend(tramo[1:])
             medio = trazado.limpiar(medio)
+        if medio is None and a["recorrido"] == "pegado":
+            medio = [paradas[0]]
+            for i, (p, q) in enumerate(zip(paradas, paradas[1:])):
+                medio.extend(trazado.pegado(p, anclajes[i].normal, q, anclajes[i + 1].normal)[1:])
+            medio = trazado.limpiar(medio)
         if medio is None:
-            modo = a["recorrido"] if a["recorrido"] != "esquivar" else "z"
+            modo = a["recorrido"] if a["recorrido"] in ("z", "l", "libre") else "z"
             medio = trazado.recorrido_ortogonal(paradas, modo)
         polilinea = ([primero.posicion] if salida > 0 else []) + medio + ([ultimo.posicion] if salida > 0 else [])
         polilinea = trazado.limpiar(polilinea)
+        # Rack de un recorrido plano junto a una pared: tuberías apiladas a lo
+        # largo de la pared (no tapándose unas a otras), con los mismos codos.
+        lado = trazado.normal_plano(polilinea) if cantidad > 1 else None
+        if lado is not None and abs(vec.punto(lado, primero.normal)) > 0.1:
+            lado = None
         for d in desplazamientos:
-            pts, radios = trazado.paralela(polilinea, d, radio_base if cantidad > 1 else radio_codo)
+            pts, radios = trazado.paralela(polilinea, d, radio_base if cantidad > 1 else radio_codo, lado=lado)
             recorridos.append(trazado.redondear(pts, radio_codo, pasos=14, radios=radios))
     else:
         return res

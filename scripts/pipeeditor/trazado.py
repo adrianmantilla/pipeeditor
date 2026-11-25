@@ -7,7 +7,7 @@ import math
 
 from pipeeditor import vec
 
-RECORRIDOS = ("z", "l", "libre", "esquivar")
+RECORRIDOS = ("z", "l", "libre", "esquivar", "pegado")
 
 
 def ortogonal(p, q, modo="z", tolerancia=1e-4):
@@ -384,6 +384,15 @@ def esquivar(p, q, obstaculos, holgura, penalizacion_codo=None, maximo=60):
         x = punto_de(nodo)
         return sum(abs(x[k] - q[k]) for k in range(3))
 
+    lo_pq = [min(p[k], q[k]) for k in range(3)]
+    hi_pq = [max(p[k], q[k]) for k in range(3)]
+    pegado = 1.0 / max(holgura * 4.0, 1e-6)
+
+    def apartado(a, b):
+        """Cuánto se sale el tramo de la caja de p y q: cuesta, para que solo se aparte junto al obstáculo."""
+        m = [(a[k] + b[k]) / 2.0 for k in range(3)]
+        return math.sqrt(sum(max(lo_pq[k] - m[k], m[k] - hi_pq[k], 0.0) ** 2 for k in range(3)))
+
     abiertos = [(h(inicio), 0.0, inicio, -1)]
     coste = {(inicio, -1): 0.0}
     padre = {}
@@ -417,7 +426,9 @@ def esquivar(p, q, obstaculos, holgura, penalizacion_codo=None, maximo=60):
                 nueva_dir = eje * 2 + (paso > 0)
                 if direccion >= 0 and nueva_dir // 2 == direccion // 2 and nueva_dir != direccion:
                     continue  # no dar media vuelta
-                g2 = g + abs(b[eje] - a[eje]) + (codo if direccion >= 0 and nueva_dir != direccion else 0.0)
+                largo = abs(b[eje] - a[eje])
+                g2 = (g + largo * (1.0 + apartado(a, b) * pegado)
+                      + (codo if direccion >= 0 and nueva_dir != direccion else 0.0))
                 clave = (vecino, nueva_dir)
                 if g2 < coste.get(clave, float("inf")):
                     coste[clave] = g2
@@ -448,7 +459,54 @@ def _laterales(puntos, arriba=(0.0, 1.0, 0.0)):
     return laterales
 
 
-def paralela(puntos, desplazamiento, radio_base, arriba=(0.0, 1.0, 0.0)):
+def normal_plano(puntos, tolerancia=1e-3):
+    """Normal del plano que contiene la polilínea, o None si no es plana (o es una recta)."""
+    dirs = [vec.unitario(vec.resta(b, a)) for a, b in zip(puntos, puntos[1:]) if vec.distancia(a, b) > 1e-9]
+    normal = None
+    for u in dirs:
+        for v in dirs:
+            n = vec.cruz(u, v)
+            if vec.largo(n) > 0.1:
+                normal = vec.unitario(n)
+                break
+        if normal is not None:
+            break
+    if normal is None:
+        return None
+    if any(abs(vec.punto(u, normal)) > tolerancia for u in dirs):
+        return None
+    return normal
+
+
+def _eje(n):
+    """Índice del eje con el que se alinea la normal ``n``, o None si es oblicua."""
+    k = max(range(3), key=lambda i: abs(n[i]))
+    return k if abs(n[k]) > 0.99 else None
+
+
+def pegado(s0, n0, s1, n1):
+    """Recorrido en ángulo recto que va pegado a las superficies de los dos anclajes.
+
+    ``s0`` y ``s1``: puntos ya separados de la superficie (la salida); ``n0`` y
+    ``n1``: normales de las superficies. De una pared al suelo baja por la
+    pared hasta el suelo, va por el rincón y sale por el suelo hasta el
+    destino, como una instalación real (y así hay dónde poner soportes). Si
+    las superficies no son perpendiculares, en Z.
+    """
+    k0, k1 = _eje(n0), _eje(n1)
+    if k0 is None or k1 is None:
+        return recorrido_ortogonal([s0, s1], "z")
+    if k0 == k1:
+        return recorrido_ortogonal([s0, s1], "z")
+    otro = 3 - k0 - k1
+    c1 = list(s0)
+    c1[k1] = s1[k1]          # por la primera superficie hasta la altura de la segunda
+    c2 = list(c1)
+    c2[otro] = s1[otro]      # por el rincón entre las dos
+    return limpiar([tuple(s0), tuple(c1), tuple(c2), tuple(s1)])
+
+
+def paralela(puntos, desplazamiento, radio_base, arriba=(0.0, 1.0, 0.0), lado=None):
     """Polilínea en ángulo recto desplazada ``desplazamiento`` a un lado, y el radio de cada esquina.
 
     Las esquinas se calculan para que los codos de todas las tuberías del rack
@@ -459,6 +517,10 @@ def paralela(puntos, desplazamiento, radio_base, arriba=(0.0, 1.0, 0.0)):
         return list(puntos), {}
     if abs(desplazamiento) < 1e-12:
         return list(puntos), {i: radio_base for i in range(1, len(puntos) - 1)}
+    if lado is not None:
+        # Recorrido plano: las tuberías se apilan fuera del plano, todas iguales.
+        o = vec.escala(lado, desplazamiento)
+        return [vec.suma(p, o) for p in puntos], {i: radio_base for i in range(1, len(puntos) - 1)}
     laterales = _laterales(puntos, arriba)
     offs = [vec.escala(l, desplazamiento) for l in laterales]
     salida = [vec.suma(puntos[0], offs[0])]
