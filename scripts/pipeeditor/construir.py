@@ -176,6 +176,13 @@ def _a_escena(p):
 def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, empujar, obstaculos=(),
                   cache=None):
     b = dict(a, arriba="y")
+    if a.get("_forma"):
+        guardada = forma_de_lista(a["_forma"])
+        b["_forma"] = None
+        if guardada is not None:
+            r = Resultado()
+            r.hilos = [[_a_interno(p) for p in h] for h in guardada[1]]
+            b["_forma"] = forma_a_lista(r, [Anclaje(_a_interno(p)) for p in guardada[0]])
     anclajes = [Anclaje(_a_interno(x.posicion), _a_interno(x.normal), x.factor, x.longitud, x.desliza)
                 for x in anclajes]
     ruta = [_a_interno(p) for p in ruta] if ruta is not None else None
@@ -271,6 +278,14 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None, ca
         marco_ini = vec.marco_desde_eje(vec.resta(camino[0], vec.escala(t0, inicio.largo)), t0)
         marco_fin = vec.marco_desde_eje(vec.resta(camino[-1], vec.escala(t1, fin.largo)), t1)
         res.longitudes = [vec.longitud_polilinea(camino)]
+    elif len(anclajes) >= 2 and _forma_valida(a.get("_forma"), anclajes, cantidad if suelto else 1):
+        hilos = deformar_forma(a["_forma"], anclajes)
+        camino = hilos[0]
+        res.hilos = hilos if len(hilos) > 1 else []
+        res.longitudes = [vec.longitud_polilinea(camino)]
+        res.reposado = True
+        marco_ini = vec.marco_desde_eje(anclajes[0].posicion, anclajes[0].normal)
+        marco_fin = vec.marco_desde_eje(anclajes[-1].posicion, anclajes[-1].normal)
     elif len(anclajes) >= 2 and _de_cache(cache, a, anclajes, res):
         camino, marco_ini, marco_fin = cache["camino"], cache["marco_ini"], cache["marco_fin"]
     elif len(anclajes) >= 2 and suelto:
@@ -315,6 +330,88 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None, ca
         for p, t, _s in trazado.uniforme(camino, a["separacion_bridas_haz"], margen=margen):
             res.piezas.anadir(modelo, vec.marco_desde_eje(p, t))
     return res
+
+
+# --- forma fijada ----------------------------------------------------------------------
+# «Asentar y fijar» guarda la forma del cable (y dónde estaban sus anclajes)
+# en una lista de números: [nº anclajes, x y z de cada uno, nº hilos, puntos de
+# cada hilo, x y z de cada punto]. Mientras esté guardada, el cable no se
+# vuelve a calcular: si se mueve un anclaje, la forma se estira hasta él.
+
+def forma_a_lista(res, anclajes):
+    hilos = res.hilos or ([res.curva] if res.curva else [])
+    if len(anclajes) < 2 or not hilos:
+        return []
+    datos = [float(len(anclajes))]
+    for x in anclajes:
+        datos.extend(float(c) for c in x.posicion)
+    datos.append(float(len(hilos)))
+    datos.extend(float(len(h)) for h in hilos)
+    for h in hilos:
+        for p in h:
+            datos.extend(float(c) for c in p)
+    return datos
+
+
+def forma_de_lista(datos):
+    """(anclajes, hilos) guardados, o None si la lista no es válida."""
+    try:
+        datos = list(datos or [])
+        k = int(datos[0])
+        anclas = [tuple(datos[1 + 3 * i:4 + 3 * i]) for i in range(k)]
+        i = 1 + 3 * k
+        h = int(datos[i])
+        cuentas = [int(c) for c in datos[i + 1:i + 1 + h]]
+        i += 1 + h
+        hilos = []
+        for c in cuentas:
+            hilos.append([tuple(datos[i + 3 * j:i + 3 * j + 3]) for j in range(c)])
+            i += 3 * c
+        if k < 2 or not hilos or i != len(datos) or any(len(x) < 2 for x in hilos):
+            return None
+        return anclas, hilos
+    except (IndexError, ValueError, TypeError):
+        return None
+
+
+def _forma_valida(forma, anclajes, hilos_esperados):
+    if not forma:
+        return False
+    guardada = forma_de_lista(forma)
+    return (guardada is not None and len(guardada[0]) == len(anclajes)
+            and len(guardada[1]) == hilos_esperados)
+
+
+def deformar_forma(forma, anclajes):
+    """La forma guardada, estirada para que siga a los anclajes donde están ahora.
+
+    Cada punto se mueve lo que se han movido los anclajes que tiene a los
+    lados, repartido según la distancia a lo largo del cable.
+    """
+    anclas, hilos = forma_de_lista(forma)
+    nuevas = [x.posicion for x in anclajes]
+    movidos = [vec.resta(n, v) for n, v in zip(nuevas, anclas)]
+    salida = []
+    for h in hilos:
+        s = vec.acumulada(h)
+        total = s[-1] if s[-1] > 0 else 1.0
+        # dónde cae cada anclaje a lo largo del hilo
+        donde = [0.0]
+        for v in anclas[1:-1]:
+            j = min(range(len(h)), key=lambda j: vec.distancia(h[j], v))
+            donde.append(max(donde[-1], s[j]))
+        donde.append(total)
+        nuevo = []
+        tramo = 0
+        for p, sp in zip(h, s):
+            while tramo < len(donde) - 2 and sp > donde[tramo + 1]:
+                tramo += 1
+            a0, a1 = donde[tramo], donde[tramo + 1]
+            u = (sp - a0) / (a1 - a0) if a1 > a0 else 0.0
+            d = vec.mezcla(movidos[tramo], movidos[tramo + 1], u)
+            nuevo.append(vec.suma(p, d))
+        salida.append(nuevo)
+    return salida
 
 
 def _extremos(a, anclajes, inicio, fin):

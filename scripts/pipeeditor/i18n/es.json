@@ -238,5 +238,11 @@
   "opcion_recorrido_pegado": "Junto a las superficies",
   "opcion_conector_aislador": "Aislador",
   "estado_sin_reposo": "Sin reposo físico: este Maya no trae numpy. El cable cuelga como catenaria y se apoya sin física.",
-  "escena_migrada": "PipeEditor: {n} cables o tuberías de una versión anterior; se mantienen como estaban."
+  "escena_migrada": "PipeEditor: {n} cables o tuberías de una versión anterior; se mantienen como estaban.",
+  "fijar_forma": "Asentar y fijar",
+  "fijar_forma_ayuda": "Guarda la forma que tiene ahora el cable y deja de calcularla: ya no cambia al mover los objetos de apoyo ni al abrir la escena, y pesa mucho menos. Si mueves un extremo, la forma se estira hasta él. Vuelve a pulsar para soltarlo.",
+  "fijado_si": "Forma fijada: el cable ya no se recalcula.",
+  "fijado_no": "Cable suelto: vuelve a calcularse.",
+  "falta_cable_vivo": "Selecciona antes un cable creado con anclajes (no desde una curva).",
+  "estado_fijados": "{n} con la forma fijada."
 }

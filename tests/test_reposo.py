@@ -245,3 +245,60 @@ class Cache(unittest.TestCase):
         cache["firma_apoyos"] = "otra mesa"
         r3 = c.construir({"holgura": 0.7, "salida": 0.0}, A, cache=cache)
         self.assertEqual(r2.longitudes, r3.longitudes)
+
+
+@unittest.skipIf(np is None, "sin numpy")
+class FormaFijada(unittest.TestCase):
+    def _fijar(self, a, anclajes):
+        res = c.construir(a, anclajes)
+        return res, c.forma_a_lista(res, anclajes)
+
+    def test_la_forma_fijada_no_se_recalcula(self):
+        a = {"holgura": 0.6, "salida": 0.0}
+        r1, forma = self._fijar(a, A)
+        r2 = c.construir(dict(a, _forma=forma, rigidez=0.9, semilla=7), A)
+        self.assertTrue(r2.reposado)
+        self.assertAlmostEqual(r1.longitud, r2.longitud, delta=r1.longitud * 0.01)
+        for p, q in zip(r1.curva[::10], r2.curva[::10]):
+            self.assertLess(vec.distancia(p, q), 1.0)
+
+    def test_sigue_al_extremo_que_se_mueve(self):
+        a = {"holgura": 0.6, "salida": 0.0}
+        r1, forma = self._fijar(a, A)
+        movido = [A[0], c.Anclaje((430, 120, 0), (-1, 0, 0))]
+        r2 = c.construir(dict(a, _forma=forma), movido)
+        self.assertLess(vec.distancia(r2.curva[0], r1.curva[0]), 0.5)
+        self.assertLess(vec.distancia(r2.curva[-1], (430, 120, 0)), 1.0)
+        # el punto medio se mueve más o menos la mitad
+        medio = len(r1.curva) // 2
+        self.assertTrue(5.0 < vec.distancia(r1.curva[medio], r2.curva[medio]) < 30.0)
+
+    def test_con_otro_numero_de_anclajes_se_recalcula(self):
+        a = {"holgura": 0.6, "salida": 0.0}
+        _r1, forma = self._fijar(a, A)
+        tres = [A[0], c.Anclaje((200, 150, 0), (0, 1, 0)), A[1]]
+        r2 = c.construir(dict(a, _forma=forma), tres)
+        self.assertTrue(any(abs(p[1] - 150) < 1.0 for p in r2.curva))
+
+    def test_lista_rota_no_falla(self):
+        self.assertIsNone(c.forma_de_lista([2.0, 1.0]))
+        self.assertIsNone(c.forma_de_lista([]))
+        r = c.construir({"holgura": 0.6, "salida": 0.0, "_forma": [5.0, 1.0, 2.0]}, A)
+        self.assertGreater(len(r.curva), 2)
+
+    def test_eje_z_arriba(self):
+        az = [c.Anclaje((0, 0, 100), (1, 0, 0)), c.Anclaje((400, 0, 100), (-1, 0, 0))]
+        a = {"holgura": 0.6, "salida": 0.0, "arriba": "z"}
+        r1, forma = self._fijar(a, az)
+        r2 = c.construir(dict(a, _forma=forma), az)
+        for p, q in zip(r1.curva[::10], r2.curva[::10]):
+            self.assertLess(vec.distancia(p, q), 1.0)
+
+    def test_haz_suelto(self):
+        a = {"holgura": 0.6, "salida": 0.0, "haz": 3, "separacion_bridas_haz": 0.0, "apoyar_suelo": True}
+        r1, forma = self._fijar(a, A)
+        self.assertEqual(len(r1.hilos), 3)
+        r2 = c.construir(dict(a, _forma=forma), A)
+        self.assertEqual(len(r2.hilos), 3)
+        r3 = c.construir(dict(a, _forma=forma, haz=1), A)  # otro número de cables: se recalcula
+        self.assertEqual(len(r3.hilos), 0)

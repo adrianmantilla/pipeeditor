@@ -54,9 +54,10 @@ class ServicioMaya(object):
         return reposo.disponible()
 
     def informacion(self, nodos):
-        total = {"longitud": 0.0, "caida": 0.0, "triangulos": 0, "tensos": 0}
+        total = {"longitud": 0.0, "caida": 0.0, "triangulos": 0, "tensos": 0, "fijados": 0}
         for n in nodos:
             i = escena.informacion(n)
+            total["fijados"] += 1 if escena.esta_fijado(n) else 0
             total["longitud"] += i["longitud"]
             total["caida"] = max(total["caida"], i["caida"])
             total["triangulos"] += i["triangulos"]
@@ -139,6 +140,13 @@ class ServicioMaya(object):
         if not anclas:
             raise ValueError(t("falta_ancla"))
         return t("gancho_si" if escena.alternar_gancho(anclas) else "gancho_no")
+
+    def alternar_fijado(self):
+        nodos = self.seleccion()
+        hecho = escena.alternar_fijado(nodos) if nodos else None
+        if hecho is None:
+            raise ValueError(t("falta_cable_vivo"))
+        return t("fijado_si" if hecho else "fijado_no")
 
     def seleccionar_anclas(self):
         anclas = []

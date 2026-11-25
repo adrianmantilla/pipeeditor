@@ -228,6 +228,27 @@ def alternar_gancho(anclas):
     return nuevo
 
 
+def esta_fijado(n):
+    return cmds.attributeQuery("formaFijada", node=n, exists=True) and bool(cmds.getAttr(n + ".formaFijada"))
+
+
+def alternar_fijado(nodos_):
+    """«Asentar y fijar»: guarda la forma actual de los cables (ya asentados) y deja de calcularla.
+
+    Si ya estaban todos fijados, los suelta: vuelven a calcularse. Devuelve
+    True si quedan fijados, False si se sueltan y None si no hay cables.
+    """
+    cables = [n for n in nodos_ if leer_ajustes(n)["tipo"] == "cable" and not cmds.listConnections(n + ".ruta")]
+    if not cables:
+        return None
+    fijar = not all(esta_fijado(n) for n in cables)
+    with Bloque("Asentar y fijar" if fijar else "Soltar"):
+        for n in cables:
+            forma = (cmds.getAttr(n + ".forma") or []) if fijar else []
+            cmds.setAttr(n + ".formaFijada", forma, type="doubleArray")
+    return fijar
+
+
 def crear(anclajes, ajustes, base=None):
     """Crea un cable o una tubería entre ``anclajes``.
 

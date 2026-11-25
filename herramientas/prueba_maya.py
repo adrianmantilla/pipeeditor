@@ -14,10 +14,12 @@ lista de fallos. Con el argumento ``--render carpeta`` guarda además una
 escena de ejemplo en esa carpeta.
 """
 
+import math
 import os
 import shutil
 import sys
 import tempfile
+import time
 import traceback
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -199,6 +201,24 @@ def main():
         bajo = [p for p in pl if x0 + 1 < p[0] < x1 - 1 and z0 + 1 < p[2] < z1 - 1 and 2.0 < p[1] < y1 - 0.5]
         comprobar(not bajo, "lámpara: cae por el borde de la mesa ({} puntos bajo o dentro del tablero)".format(
             len(bajo)))
+
+        # asentar y fijar: la forma no cambia con los ajustes; el extremo sí sigue a su anclaje
+        comprobar(escena.alternar_fijado([nl]) is True and escena.esta_fijado(nl), "asentar y fijar")
+        antes = puntos_curva(escena.formas_de(nl)[2], 50)
+        cmds.setAttr(nl + ".rigidez", 0.9)
+        despues = puntos_curva(escena.formas_de(nl)[2], 50)
+        comprobar(max(math.dist(p, q) for p, q in zip(antes, despues)) < 0.5,
+                  "fijado: cambiar la rigidez no cambia el cable")
+        ancla_fin = escena.anclas_de(nl)[-1]
+        fin_antes = cmds.xform(ancla_fin, query=True, worldSpace=True, translation=True)
+        t = time.time()
+        cmds.move(0, 0, 40, ancla_fin, relative=True, worldSpace=True)
+        despues = puntos_curva(escena.formas_de(nl)[2], 50)
+        ms = (time.time() - t) * 1000
+        comprobar(math.dist(despues[-1], antes[-1]) > 30 and math.dist(despues[0], antes[0]) < 0.5,
+                  "fijado: la forma sigue al extremo que se mueve ({:.0f} ms)".format(ms))
+        cmds.xform(ancla_fin, worldSpace=True, translation=fin_antes)
+        comprobar(escena.alternar_fijado([nl]) is False and not escena.esta_fijado(nl), "soltar la forma")
         cmds.delete(lamp, mesa2, enchufe)
 
         # puntos intermedios

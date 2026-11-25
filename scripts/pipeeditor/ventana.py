@@ -151,6 +151,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         for i, (clave, funcion) in enumerate((("insertar_punto", self.servicio.insertar_punto),
                                               ("quitar_punto", self.servicio.quitar_puntos),
                                               ("gancho", self.servicio.alternar_gancho),
+                                              ("fijar_forma", self.servicio.alternar_fijado),
                                               ("seleccionar_anclas", self.servicio.seleccionar_anclas),
                                               ("seleccionar_cuerpo", self.servicio.seleccionar_cuerpos),
                                               ("hornear", self._hornear),
@@ -337,6 +338,8 @@ class VentanaPipeEditor(QtWidgets.QWidget):
                 texto += " · " + t("estado_caida", caida=_metros(info["caida"]))
             if info.get("tensos"):
                 texto += "\n" + t("estado_tenso", n=info["tensos"])
+            if info.get("fijados"):
+                texto += "\n" + t("estado_fijados", n=info["fijados"])
             if self.tipo == "cable" and not self._hay_reposo():
                 texto += "\n" + t("estado_sin_reposo")
             self.estado.setText(texto)

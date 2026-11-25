@@ -90,6 +90,7 @@ class PipeEditorNodo(om.MPxNode):
         self._cache = {}          # último recorrido calculado (ver construir.construir)
         self._borrador = False    # el último cálculo fue rápido, mientras se arrastraba
         self._vigilando = False
+        self._anclajes = []
 
     @staticmethod
     def crear():
@@ -127,6 +128,10 @@ class PipeEditorNodo(om.MPxNode):
         num.storable = False
         num.keyable = False
         num.hidden = True
+        # Forma guardada con «Asentar y fijar» (vacía = el cable se calcula): ver construir.forma_a_lista.
+        A["formaFijada"] = typ.create("formaFijada", "ffi", om.MFnData.kDoubleArray)
+        typ.keyable = False
+        typ.hidden = True
         # Versión de los datos con la que se creó el nodo (0 = PipeEditor 1.0): ver construir.migrar.
         A["versionDatos"] = num.create("versionDatos", "vda", om.MFnNumericData.kInt, 0)
         num.keyable = False
@@ -168,6 +173,10 @@ class PipeEditorNodo(om.MPxNode):
         A["longitudesActuales"] = typ.create("longitudesActuales", "lac", om.MFnData.kDoubleArray)
         typ.writable = False
         typ.storable = False
+        A["forma"] = typ.create("forma", "frm", om.MFnData.kDoubleArray)
+        typ.writable = False
+        typ.storable = False
+        typ.hidden = True
         for nombre, corto, tipo in (("longitudTotal", "lto", om.MFnNumericData.kDouble),
                                     ("caida", "cai", om.MFnNumericData.kDouble),
                                     ("triangulos", "tri", om.MFnNumericData.kInt),
@@ -176,7 +185,7 @@ class PipeEditorNodo(om.MPxNode):
             num.writable = False
             num.storable = False
 
-        salidas = ["cuerpo", "piezas", "metal", "curva", "longitudesActuales", "longitudTotal", "caida",
+        salidas = ["cuerpo", "piezas", "metal", "curva", "longitudesActuales", "forma", "longitudTotal", "caida",
                    "triangulos", "tensos"]
         entradas = [n for n in A if n not in salidas]
         for n in entradas + salidas:
@@ -188,7 +197,7 @@ class PipeEditorNodo(om.MPxNode):
     # --- cálculo ----------------------------------------------------------------------
     def compute(self, plug, datos):
         A = PipeEditorNodo.atributos
-        salidas = ("cuerpo", "piezas", "metal", "curva", "longitudesActuales", "longitudTotal", "caida",
+        salidas = ("cuerpo", "piezas", "metal", "curva", "longitudesActuales", "forma", "longitudTotal", "caida",
                    "triangulos", "tensos")
         if plug.isNull or om.MFnAttribute(plug.attribute()).name not in salidas:
             return None
@@ -197,6 +206,7 @@ class PipeEditorNodo(om.MPxNode):
         except Exception as error:  # nunca tumbar Maya por un cable
             om.MGlobal.displayWarning("PipeEditor: {}".format(error))
             res = construir.Resultado()
+            self._anclajes = []
         datos.outputValue(A["cuerpo"]).setMObject(_malla_maya(res.cuerpo))
         # Las escenas de antes no tienen la malla de metal: entonces va con las piezas.
         con_metal = om.MPlug(self.thisMObject(), A["metal"]).isSource
@@ -207,6 +217,8 @@ class PipeEditorNodo(om.MPxNode):
         datos.outputValue(A["curva"]).setMObject(_curva_maya(res.curva))
         datos.outputValue(A["longitudesActuales"]).setMObject(
             om.MFnDoubleArrayData().create(om.MDoubleArray(res.longitudes)))
+        datos.outputValue(A["forma"]).setMObject(
+            om.MFnDoubleArrayData().create(om.MDoubleArray(construir.forma_a_lista(res, self._anclajes))))
         datos.outputValue(A["longitudTotal"]).setDouble(res.longitud)
         datos.outputValue(A["caida"]).setDouble(res.caida)
         datos.outputValue(A["triangulos"]).setInt(res.triangulos())
@@ -237,7 +249,13 @@ class PipeEditorNodo(om.MPxNode):
             anclajes.append(construir.Anclaje(pos, normal, factores.get(indice, 1.0), longitudes.get(indice, 0.0),
                                               deslizan.get(indice, False)))
 
+        self._anclajes = anclajes
         ajustes = construir.migrar(ajustes, datos.inputValue(A["versionDatos"]).asInt())
+        fijada = datos.inputValue(A["formaFijada"]).data()
+        if not fijada.isNull():
+            lista = list(om.MFnDoubleArrayData(fijada).array())
+            if lista:
+                ajustes["_forma"] = lista
         # Mientras se arrastra con el ratón, un reposo más corto; al soltar, el completo.
         self._borrador = borrador
         if borrador:
