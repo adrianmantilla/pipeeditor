@@ -2,7 +2,9 @@
 
 Cada idioma es un archivo JSON en esta carpeta (``es.json``, ``en.json``...).
 Si falta una clave en el idioma elegido, se usa el español.
-El idioma se elige con la variable de entorno ``PIPEEDITOR_IDIOMA``.
+El idioma se elige en el menú PipeEditor > Idioma (se guarda en las
+preferencias de Maya) o con la variable de entorno ``PIPEEDITOR_IDIOMA``,
+que manda sobre el menú.
 """
 
 import json
@@ -23,6 +25,19 @@ def _cargar(idioma):
         except (OSError, ValueError):
             _cache[idioma] = {}
     return _cache[idioma]
+
+
+def idiomas():
+    """Idiomas disponibles (los archivos JSON de esta carpeta)."""
+    return sorted(os.path.splitext(n)[0] for n in os.listdir(_CARPETA) if n.endswith(".json"))
+
+
+def idioma():
+    return _idioma
+
+
+def por_entorno():
+    return bool(os.environ.get("PIPEEDITOR_IDIOMA"))
 
 
 def usar_idioma(idioma):

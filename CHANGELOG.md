@@ -2,6 +2,19 @@
 
 Las escenas guardadas con una versión anterior se abren igual que se hicieron: PipeEditor guarda en cada nodo la versión de sus datos y, al abrir, mantiene los valores con los que se crearon.
 
+## 1.2.0
+
+### Para escenas grandes
+- **Asentar y fijar** (botón en Editar): guarda la forma del cable y deja de calcularla. No cambia al mover los apoyos ni al abrir la escena; si se mueve un extremo, la forma se estira hasta él. Vuelve a pulsar para soltarlo.
+- **Caché**: cambiar el perfil, los lados, las piezas o la resolución no vuelve a calcular el reposo.
+- **Modo borrador**: mientras arrastras un anclaje con el ratón, el reposo es más corto; al soltar se calcula entero.
+
+### Render en otro ordenador
+- **Guardar una copia horneada…** (menú PipeEditor): guarda una copia de la escena con todo horneado, que se abre en cualquier Maya sin PipeEditor (granjas de render). La escena abierta no cambia. También como orden para un atajo y desde Python: `pipeeditor.interfaz_maya.copia_horneada(ruta)`.
+
+### Idiomas
+- **Inglés**: menú PipeEditor > Idioma. Se recuerda entre sesiones; la variable `PIPEEDITOR_IDIOMA` manda sobre el menú.
+
 ## 1.1.0
 
 ### Cables

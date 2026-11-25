@@ -46,7 +46,9 @@ Para desinstalar, borra `pipeeditor.mod` de la carpeta `modules` de tus preferen
 - **Materiales** para Arnold (OpenPBR en Maya 2026 y 2027): goma, PVC, nailon, cáñamo, cobre, acero, galvanizado, óxido, hierro pintado, aluminio...
 - **Mallas limpias**: cerradas, con aristas duras y pliegue para subdividir; el metal va en su propia malla y material.
 - **UV a escala real** (1 unidad = 10 cm): una textura tileable se repite igual en todos los cables.
+- **Asentar y fijar**: guarda la forma de un cable y deja de calcularla (escenas grandes, animación de otros objetos). Si mueves un extremo, la forma se estira hasta él.
 - **Hornear**: convierte en mallas normales de Maya. Al guardar, PipeEditor avisa si quedan cables vivos, porque una escena con cables vivos necesita PipeEditor para abrirse bien.
+- **Copia horneada para render**: guarda una copia con todo horneado para una granja u otro ordenador sin PipeEditor, sin tocar la escena abierta.
 
 ## Formas de crear
 
@@ -87,7 +89,7 @@ scripts/AEpipeEditorNodoTemplate.mel      pestaña del Editor de atributos
 
 ## Traducir
 
-Los textos están en `scripts/pipeeditor/i18n/es.json`. Copia el archivo como `en.json` (u otro idioma), tradúcelo y define la variable de entorno `PIPEEDITOR_IDIOMA=en` antes de abrir Maya.
+Viene en español e inglés: **PipeEditor → Idioma**. Los textos están en `scripts/pipeeditor/i18n/` (`es.json`, `en.json`). Para otro idioma, copia `es.json` con el código del idioma (por ejemplo `fr.json`) y tradúcelo: aparece solo en el menú. La variable de entorno `PIPEEDITOR_IDIOMA` manda sobre el menú.
 
 ## Licencia
 

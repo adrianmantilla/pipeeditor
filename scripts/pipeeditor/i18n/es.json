@@ -248,5 +248,22 @@
   "menu_copia_horneada": "Guardar una copia horneada…",
   "cmd_copia_horneada": "PipeEditor: guardar una copia de la escena con todo horneado, para render en otro ordenador",
   "copia_horneada_hecha": "Copia horneada guardada ({n} cables o tuberías): {ruta}",
-  "copia_no_deshecha": "No se pudo dejar la escena como estaba tras guardar la copia. Usa Editar > Deshacer."
+  "copia_no_deshecha": "No se pudo dejar la escena como estaba tras guardar la copia. Usa Editar > Deshacer.",
+  "menu_idioma": "Idioma (Language)",
+  "idioma_es": "Español",
+  "idioma_en": "English",
+  "estilo_serie_Cable de lámpara": "Cable de lámpara",
+  "estilo_serie_Tendido eléctrico": "Tendido eléctrico",
+  "estilo_serie_Cuerda de puerto": "Cuerda de puerto",
+  "estilo_serie_Manguera de jardín": "Manguera de jardín",
+  "estilo_serie_Mazo de cables": "Mazo de cables",
+  "estilo_serie_Teléfono antiguo": "Teléfono antiguo",
+  "estilo_serie_Fontanería de cobre": "Fontanería de cobre",
+  "estilo_serie_Tubería industrial": "Tubería industrial",
+  "estilo_serie_Conducto de ventilación": "Conducto de ventilación",
+  "estilo_serie_Tubo flexible": "Tubo flexible",
+  "atrib_holgura_tramo": "Holgura de este tramo",
+  "atrib_longitud_tramo": "Longitud fija del tramo",
+  "atrib_gancho": "Pasa sin atarse (gancho)",
+  "idioma_cambiado": "Idioma cambiado a español."
 }

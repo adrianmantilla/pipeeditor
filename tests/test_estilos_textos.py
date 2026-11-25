@@ -74,9 +74,13 @@ class Textos(unittest.TestCase):
             usadas.add("material_" + n)
         for k in ("crear_clic", "crear_seleccion", "crear_grupos", "crear_aristas", "crear_curva",
                   "insertar_punto", "quitar_punto", "seleccionar_anclas", "seleccionar_cuerpo", "hornear",
-                  "borrar"):
+                  "borrar", "gancho", "fijar_forma"):
             usadas |= {k, k + "_ayuda"}
-        usadas |= {"editando_uno", "editando_varios", "material_cuerpo", "material_piezas", "material_metal"}
+        usadas |= {"editando_uno", "editando_varios", "material_cuerpo", "material_piezas", "material_metal",
+                   "atrib_holgura_tramo", "atrib_longitud_tramo", "atrib_gancho"}
+        from pipeeditor import estilos, i18n
+        usadas |= {"estilo_serie_" + n for n in estilos.DE_SERIE}
+        usadas |= {"idioma_" + i for i in i18n.idiomas()}
         faltan = sorted(usadas - claves())
         self.assertEqual(faltan, [])
 
@@ -88,6 +92,22 @@ class Textos(unittest.TestCase):
         with open(os.path.join(comun.SCRIPTS, "pipeeditor", "i18n", "es.json"), encoding="utf-8") as f:
             datos = json.load(f)
         self.assertTrue(all(isinstance(v, str) and v for v in datos.values()))
+
+    def test_ingles_completo(self):
+        es, en = claves("es"), claves("en")
+        self.assertEqual(sorted(es - en), [])
+        self.assertEqual(sorted(en - es), [])
+        from pipeeditor import i18n
+        for k in es:
+            marcas_es = set(re.findall(r"\{(\w+)\}", i18n._cargar("es")[k]))
+            marcas_en = set(re.findall(r"\{(\w+)\}", i18n._cargar("en")[k]))
+            self.assertEqual(marcas_es, marcas_en, k)
+        antes = i18n.idioma()
+        try:
+            i18n.usar_idioma("en")
+            self.assertEqual(t("creados_haz", n=3), "3 cables created.")
+        finally:
+            i18n.usar_idioma(antes)
 
     def test_listas_coinciden(self):
         self.assertIn("propio", piezas.CONECTORES)

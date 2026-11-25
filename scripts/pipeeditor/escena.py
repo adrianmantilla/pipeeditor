@@ -141,9 +141,9 @@ def _crear_ancla(nombre, posicion, normal, padre, tamano):
         cmds.setAttr("{}.localScale{}".format(forma, eje), tamano)
     cmds.setAttr(forma + ".overrideEnabled", 1)
     cmds.setAttr(forma + ".overrideColor", 17)  # amarillo
-    cmds.addAttr(loc, longName=ATRIB_FACTOR, niceName="Holgura de este tramo", attributeType="double",
+    cmds.addAttr(loc, longName=ATRIB_FACTOR, niceName=_texto("atrib_holgura_tramo"), attributeType="double",
                  defaultValue=1.0, minValue=0.0, softMaxValue=4.0, keyable=True)
-    cmds.addAttr(loc, longName=ATRIB_LONGITUD, niceName="Longitud fija del tramo", attributeType="double",
+    cmds.addAttr(loc, longName=ATRIB_LONGITUD, niceName=_texto("atrib_longitud_tramo"), attributeType="double",
                  defaultValue=0.0, minValue=0.0, keyable=False)
     _anadir_desliza(loc)
     return loc
@@ -151,7 +151,7 @@ def _crear_ancla(nombre, posicion, normal, padre, tamano):
 
 def _anadir_desliza(loc):
     if not cmds.attributeQuery(ATRIB_DESLIZA, node=loc, exists=True):
-        cmds.addAttr(loc, longName=ATRIB_DESLIZA, niceName="Pasa sin atarse (gancho)", attributeType="bool",
+        cmds.addAttr(loc, longName=ATRIB_DESLIZA, niceName=_texto("atrib_gancho"), attributeType="bool",
                      defaultValue=False, keyable=True)
 
 

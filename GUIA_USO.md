@@ -44,8 +44,11 @@ También puedes seleccionar una fila de aristas de un modelo (por ejemplo, el bo
 - **Para animar**: pon *Al mover un extremo* en **Longitud fija**; al separar los extremos el cable se tensa.
 - **Muchos cables entre dos paneles**: selecciona varias caras de un objeto y varias del otro y pulsa **Entre dos grupos**. Para que sea un mazo, usa *Cables en el haz*.
 - **Tu propio conector**: modela una pieza con el eje Y hacia donde sale el cable, selecciona el cable y la pieza y pulsa **Usar el objeto seleccionado como conector**.
+- **Escena pesada**: cuando un cable esté como quieres, pulsa **Asentar y fijar**. Deja de calcularse y la escena va más ligera.
 - **Estilos**: cuando tengas una combinación que te guste, pulsa **Guardar** junto a *Estilo*.
 
 ## Antes de entregar o compartir una escena
 
-Usa **PipeEditor → Hornear todos los de la escena**. Los cables pasan a ser mallas normales de Maya y la escena se abre en cualquier ordenador, tenga o no PipeEditor. Después ya no se pueden editar con la ventana, así que guarda antes una copia si quieres seguir cambiándolos.
+Para mandarla a render a otro ordenador, usa **PipeEditor → Guardar una copia horneada…**: guarda una copia con todo convertido en mallas normales y tu escena sigue igual, editable.
+
+Si prefieres convertir la tuya, usa **PipeEditor → Hornear todos los de la escena**. Los cables pasan a ser mallas normales de Maya y la escena se abre en cualquier ordenador, tenga o no PipeEditor. Después ya no se pueden editar con la ventana, así que guarda antes una copia si quieres seguir cambiándolos.

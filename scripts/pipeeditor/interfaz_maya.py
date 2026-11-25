@@ -8,6 +8,7 @@ from maya import cmds
 import pipeeditor
 from pipeeditor import escena
 from pipeeditor.estilos import Estilos
+from pipeeditor import i18n
 from pipeeditor.i18n import t
 from pipeeditor.qt import QtWidgets, shiboken, sigue_vivo
 
@@ -330,7 +331,36 @@ def _crear_menu():
     cmds.menuItem(label=t("menu_hornear_todo"), command=lambda *_: _hornear_todo())
     cmds.menuItem(label=t("menu_copia_horneada"), command=lambda *_: copia_horneada())
     cmds.menuItem(divider=True)
+    cmds.menuItem(label=t("menu_idioma"), subMenu=True)
+    cmds.radioMenuItemCollection()
+    for idioma in i18n.idiomas():
+        cmds.menuItem(label=t("idioma_" + idioma), radioButton=(idioma == i18n.idioma()),
+                      enable=not i18n.por_entorno(), command=lambda *_, i=idioma: cambiar_idioma(i))
+    cmds.setParent("..", menu=True)
     cmds.menuItem(label=t("menu_acerca", version=pipeeditor.__version__), enable=False)
+
+
+OPCION_IDIOMA = "PipeEditorIdioma"
+
+
+def _idioma_guardado():
+    if not i18n.por_entorno() and cmds.optionVar(exists=OPCION_IDIOMA):
+        i18n.usar_idioma(cmds.optionVar(query=OPCION_IDIOMA))
+
+
+def cambiar_idioma(idioma):
+    """Cambia el idioma de la interfaz y lo recuerda para las próximas veces."""
+    cmds.optionVar(stringValue=(OPCION_IDIOMA, idioma))
+    i18n.usar_idioma(idioma)
+    abierta = cmds.workspaceControl(CONTROL, exists=True)
+    if abierta:
+        cmds.deleteUI(CONTROL)
+        _estado["ventana"] = None
+    _crear_ordenes()
+    _crear_menu()
+    if abierta:
+        mostrar()
+    om.MGlobal.displayInfo("PipeEditor: " + t("idioma_cambiado"))
 
 
 def _hornear_todo():
@@ -366,6 +396,7 @@ def iniciar():
         cmds.selectPref(trackSelectionOrder=True)
     except RuntimeError:
         pass
+    _idioma_guardado()
     _crear_ordenes()
     if cmds.about(batch=True):
         return

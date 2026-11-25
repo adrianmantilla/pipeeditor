@@ -298,7 +298,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         self.lista_estilos.clear()
         self.lista_estilos.addItem(t("estilo_elige"), None)
         for n in self.servicio.estilos.nombres(self.tipo):
-            self.lista_estilos.addItem(n, n)
+            self.lista_estilos.addItem(t("estilo_serie_" + n) if self.servicio.estilos.es_de_serie(n) else n, n)
         self.lista_estilos.setCurrentIndex(0)
         self.lista_estilos.blockSignals(False)
 
