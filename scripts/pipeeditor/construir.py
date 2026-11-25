@@ -421,6 +421,10 @@ def _camino_colgante(a, anclajes, inicio, fin, r, suelo, bajar, res, empujar=Non
         res.longitudes = largos
         for t in tramos:
             res.caida = max(res.caida, catenaria.caida(t))
+        if salida > 0:
+            rmin = reposo.radio_minimo(r, a["rigidez"])
+            camino = _curva_de_salida(camino, primero.normal, rmin)
+            camino = list(reversed(_curva_de_salida(list(reversed(camino)), ultimo.normal, rmin)))
         camino = _fuera_de_objetos(_sobre_suelo(trazado.suavizar(camino), suelo, r), empujar, r)
     else:
         camino = [c0] if salida > 0 else []
@@ -437,6 +441,50 @@ def _camino_colgante(a, anclajes, inicio, fin, r, suelo, bajar, res, empujar=Non
     marco_ini = vec.marco_desde_eje(primero.posicion, primero.normal)
     marco_fin = vec.marco_desde_eje(ultimo.posicion, ultimo.normal)
     return camino, marco_ini, marco_fin
+
+
+def _curva_de_salida(camino, normal, rmin):
+    """Une la salida recta del conector con el resto del cable sin esquina.
+
+    ``camino[0]`` es la punta del conector y ``camino[1]`` el final de la
+    salida recta (en la dirección ``normal``). Un cable rígido no dobla ahí en
+    seco: se cambia el principio del camino por una curva (Hermite) que sale
+    en la dirección de la salida y llega tangente al cable, con largo
+    suficiente para no doblar más que ``rmin``.
+    """
+    if len(camino) < 4:
+        return camino
+    c0 = camino[0]
+    salida = vec.distancia(c0, camino[1])
+    s = vec.acumulada(camino)
+    # dirección del cable justo después de la salida
+    j = 2
+    while j < len(camino) - 1 and s[j] - s[1] < max(salida, rmin * 0.25):
+        j += 1
+    t = vec.unitario(vec.resta(camino[j], camino[1]), normal)
+    giro = math.acos(max(-1.0, min(1.0, vec.punto(vec.unitario(normal), t))))
+    if giro < math.radians(3.0):
+        return camino
+    # largo de la curva: lo que hace falta para girar ``giro`` con radio rmin
+    largo = salida + rmin * giro
+    k = 2
+    while k < len(camino) - 2 and s[k] < largo:
+        k += 1
+    if k >= len(camino) - 2:
+        return camino
+    p1 = camino[k]
+    t1 = vec.unitario(vec.resta(camino[k + 1], camino[k - 1]), t)
+    d = vec.distancia(c0, p1)
+    m0 = vec.escala(vec.unitario(normal), d)
+    m1 = vec.escala(t1, d)
+    partes = max(6, int(math.ceil(giro / math.radians(3.0))))
+    curva = []
+    for i in range(partes):
+        u = i / float(partes)
+        h00, h10 = 2 * u ** 3 - 3 * u ** 2 + 1, u ** 3 - 2 * u ** 2 + u
+        h01, h11 = -2 * u ** 3 + 3 * u ** 2, u ** 3 - u ** 2
+        curva.append(tuple(c0[n] * h00 + m0[n] * h10 + p1[n] * h01 + m1[n] * h11 for n in range(3)))
+    return curva + list(camino[k:])
 
 
 def _haz_suelto(a, anclajes, inicio, fin, r, suelo, bajar, empujar, res):

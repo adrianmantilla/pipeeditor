@@ -86,6 +86,18 @@ class Reposo(unittest.TestCase):
         # radio mínimo 10 (r = 1): con tramos de 2, menos de ~25 grados
         self.assertLess(angulo_maximo(r.curva, 2.0), 25.0)
 
+    def test_salida_recta_sin_esquina(self):
+        # Mucha holgura: el cable cae casi en vertical justo después de la
+        # salida recta. Antes doblaba en seco al final de la salida (~33°
+        # cada 3 cm); ahora sale recto y curva hacia abajo.
+        anclajes = [c.Anclaje((0, 290, 0), (1, 0, 0)), c.Anclaje((500, 240, 100), (-1, 0, 0))]
+        r = c.construir({"grosor": 2.0, "holgura": 0.9, "salida": 5.0, "semilla": 1}, anclajes)
+        self.assertTrue(r.reposado)
+        self.assertLess(angulo_maximo(r.curva, 1.6), 20.0)
+        # y empieza en la dirección de la salida
+        t = vec.unitario(vec.resta(r.curva[1], r.curva[0]))
+        self.assertGreater(t[0], 0.95)
+
     def test_antes_subia_los_puntos_y_perdia_longitud(self):
         sin = c.construir({"holgura": 0.5, "salida": 0.0, "reposo": False}, A)
         con = c.construir({"holgura": 0.5, "salida": 0.0}, A)
