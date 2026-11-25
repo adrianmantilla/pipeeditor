@@ -13,6 +13,7 @@ from pipeeditor import vec
 CONECTORES = ("ninguno", "clavija", "jack", "terminal", "gancho", "grillete", "propio", "aislador")
 PIEZAS_CABLE = ("ninguna", "brida", "anillo", "etiqueta")
 EXTREMOS_TUBERIA = ("abiertos", "tapon", "brida")
+SENALES = ("ninguna", "flecha", "banda", "flecha_y_banda")
 
 
 class Conector(object):
@@ -139,6 +140,36 @@ def tapon(R):
     m = ml.cilindro(R * 1.12, -R * 0.3, R * 0.5, 16)
     m.anadir(ml.cilindro(R * 0.6, R * 0.5, R * 0.75, 6))
     return m
+
+
+def largo_flecha(R):
+    return max(R * 6.0, 8.0)
+
+
+def flecha(R):
+    """Flecha de sentido pegada a la tubería (apunta a +Y, centrada en X+)."""
+    largo = largo_flecha(R)
+    grueso = max(R * 0.02, 0.03)
+    radio = R * 1.004
+
+    def arco(mitad):
+        pasos = 6
+        fuera = [(radio + grueso, -mitad + 2 * mitad * k / pasos) for k in range(pasos + 1)]
+        dentro = [(radio, mitad - 2 * mitad * k / pasos) for k in range(pasos + 1)]
+        return [(r * math.cos(a), -r * math.sin(a)) for r, a in fuera + dentro]
+
+    cuerpo, cabeza = math.radians(11.0), math.radians(26.0)
+    y0, y1, y2 = -largo / 2.0, largo * 0.1, largo / 2.0
+    centros = [(0.0, y0, 0.0), (0.0, y1, 0.0), (0.0, y1, 0.0), (0.0, y2, 0.0)]
+    anchos = [cuerpo, cuerpo, cabeza, math.radians(0.5)]
+    marcos = [((0, 1, 0), (1, 0, 0), (0, 0, -1))] * 4
+    return ml.barrer(centros, marcos, lambda i: arco(anchos[i]), tapas=True)
+
+
+def banda(R):
+    """Banda de color alrededor de la tubería, para identificar el fluido."""
+    ancho = min(max(2.0 * R, 5.0), 25.0)
+    return ml.cilindro(R * 1.012, -ancho / 2.0, ancho / 2.0, 24)
 
 
 def soporte(R, origen, tangente, contacto, normal_superficie):

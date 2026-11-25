@@ -29,6 +29,7 @@ global proc AEpipeEditorNodoTemplate(string $nodo)
     editorTemplate -endLayout;
     editorTemplate -beginLayout (pipeEditorTexto("seccion_recorrido")) -collapse 0;
         editorTemplate -label (pipeEditorTexto("campo_recorrido")) -addControl "recorrido";
+        editorTemplate -label (pipeEditorTexto("campo_pendiente")) -addControl "pendiente";
         editorTemplate -label (pipeEditorTexto("campo_radio_codo")) -addControl "radioCodo";
         editorTemplate -label (pipeEditorTexto("campo_codo")) -addControl "codo";
     editorTemplate -endLayout;
@@ -43,6 +44,9 @@ global proc AEpipeEditorNodoTemplate(string $nodo)
         editorTemplate -label (pipeEditorTexto("campo_separacion_bridas")) -addControl "separacionBridas";
         editorTemplate -label (pipeEditorTexto("campo_separacion_soportes")) -addControl "separacionSoportes";
         editorTemplate -label (pipeEditorTexto("campo_alcance_soportes")) -addControl "alcanceSoportes";
+        editorTemplate -label (pipeEditorTexto("campo_soportes_hacia")) -addControl "soportesHacia";
+        editorTemplate -label (pipeEditorTexto("campo_senales")) -addControl "senales";
+        editorTemplate -label (pipeEditorTexto("campo_separacion_senales")) -addControl "separacionSenales";
     editorTemplate -endLayout;
     editorTemplate -beginLayout (pipeEditorTexto("seccion_haz")) -collapse 0;
         editorTemplate -label (pipeEditorTexto("campo_haz")) -addControl "haz";
@@ -56,6 +60,9 @@ global proc AEpipeEditorNodoTemplate(string $nodo)
         editorTemplate -label (pipeEditorTexto("campo_tensos")) -addControl "tensos";
     editorTemplate -endLayout;
     editorTemplate -suppress "anclas";
+    editorTemplate -suppress "formaFijada";
+    editorTemplate -suppress "forma";
+    editorTemplate -suppress "refinar";
     editorTemplate -suppress "factores";
     editorTemplate -suppress "longitudes";
     editorTemplate -suppress "ruta";

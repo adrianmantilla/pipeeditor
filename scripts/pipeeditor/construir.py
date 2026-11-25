@@ -13,16 +13,27 @@ TIPOS = ("cable", "tuberia")
 MODOS_TENSION = ("holgura", "longitud")
 CODOS = ("curvado", "pieza", "soldado")
 EJES = ("y", "z")
-NORMAS = ("libre", "acero", "cobre")
+SOPORTES_HACIA = ("cercana", "techo", "suelo")
+NORMAS = ("libre", "acero", "cobre", "pvc", "desague", "multicapa", "ansi")
 
 # Diámetros exteriores normalizados, en cm, con su espesor de pared.
 # Acero: tubo DN (EN 10255 / ISO 65, serie media). Cobre: EN 1057.
+# PVC a presión: EN 1452 (PN10). Desagüe: PVC EN 1329. Multicapa: PEX-AL-PEX.
+# ANSI: acero ASME B36.10, Schedule 40 (de 1/2" a 12").
 MEDIDAS = {
     "acero": ((2.13, 0.26), (2.69, 0.26), (3.37, 0.32), (4.24, 0.32), (4.83, 0.32), (6.03, 0.36),
               (7.61, 0.36), (8.89, 0.40), (11.43, 0.45), (13.97, 0.50), (16.83, 0.50), (21.91, 0.63),
               (27.30, 0.63), (32.39, 0.71)),
     "cobre": ((1.0, 0.1), (1.2, 0.1), (1.5, 0.1), (1.8, 0.1), (2.2, 0.1), (2.8, 0.12), (3.5, 0.15),
               (4.2, 0.15), (5.4, 0.2), (6.4, 0.2), (7.6, 0.2), (10.8, 0.25)),
+    "pvc": ((2.5, 0.15), (3.2, 0.16), (4.0, 0.19), (5.0, 0.24), (6.3, 0.30), (7.5, 0.36), (9.0, 0.43),
+            (11.0, 0.42), (12.5, 0.48), (16.0, 0.62), (20.0, 0.77), (25.0, 0.96), (31.5, 1.21)),
+    "desague": ((3.2, 0.30), (4.0, 0.30), (5.0, 0.30), (7.5, 0.30), (9.0, 0.30), (11.0, 0.32), (12.5, 0.32),
+                (16.0, 0.32), (20.0, 0.39)),
+    "multicapa": ((1.6, 0.20), (2.0, 0.20), (2.6, 0.30), (3.2, 0.30), (4.0, 0.35), (5.0, 0.40), (6.3, 0.45)),
+    "ansi": ((2.13, 0.277), (2.67, 0.287), (3.34, 0.338), (4.22, 0.356), (4.83, 0.368), (6.03, 0.391),
+             (7.30, 0.516), (8.89, 0.549), (11.43, 0.602), (14.13, 0.655), (16.83, 0.711), (21.91, 0.818),
+             (27.31, 0.927), (32.39, 1.031)),
 }
 
 
@@ -80,6 +91,10 @@ POR_DEFECTO = {
     "separacion_soportes": 0.0,
     "soportes_auto": False,      # separación de soportes según el diámetro
     "alcance_soportes": 60.0,
+    "soportes_hacia": "cercana",  # superficie más cercana, o colgada del techo, o apoyada en el suelo
+    "pendiente": 0.0,            # caída de los tramos horizontales (0,02 = 2 %), hacia el último anclaje
+    "senales": "ninguna",        # flechas de sentido o bandas de color a lo largo
+    "separacion_senales": 300.0,
 }
 
 
@@ -189,8 +204,11 @@ def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, 
     bajar_i = (lambda x, y, z: bajar(*_a_escena((x, y, z)))) if bajar is not None else None
     cercano_i = None
     if cercano is not None:
-        def cercano_i(p, t):
-            golpe = cercano(_a_escena(p), _a_escena(t))
+        def cercano_i(p, t, direccion=None):
+            if direccion is None:
+                golpe = cercano(_a_escena(p), _a_escena(t))
+            else:
+                golpe = cercano(_a_escena(p), _a_escena(t), _a_escena(direccion))
             if golpe is None:
                 return None
             return _a_interno(golpe[0]), _a_interno(golpe[1])
@@ -768,6 +786,8 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano, obstaculos=()):
             medio = trazado.recorrido_ortogonal(paradas, modo)
         polilinea = ([primero.posicion] if salida > 0 else []) + medio + ([ultimo.posicion] if salida > 0 else [])
         polilinea = trazado.limpiar(polilinea)
+        if a["pendiente"] > 0:
+            polilinea = trazado.con_pendiente(polilinea, a["pendiente"])
         # Rack de un recorrido plano junto a una pared: tuberías apiladas a lo
         # largo de la pared (no tapándose unas a otras), con los mismos codos.
         lado = trazado.normal_plano(polilinea) if cantidad > 1 else None
@@ -837,6 +857,22 @@ def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
         for p, t, d in trazado.uniforme(camino, 100.0, margen=R * 2):
             if en_recta(d):
                 res.piezas.anadir(f, vec.marco_desde_eje(p, t))
+    # Señales: flechas de sentido y bandas de color en los tramos rectos.
+    if a["senales"] != "ninguna" and a["separacion_senales"] > 0:
+        con_banda = a["senales"] in ("banda", "flecha_y_banda")
+        con_flecha = a["senales"] in ("flecha", "flecha_y_banda")
+        mb, mf = piezas.banda(R_fuera), piezas.flecha(R_fuera)
+        ancho = min(max(2.0 * R_fuera, 5.0), 25.0)
+        avance = (ancho / 2.0 + piezas.largo_flecha(R_fuera) * 0.6) if con_banda else 0.0
+        arriba = (0.0, 1.0, 0.0)
+        for p, t, d in trazado.uniforme(camino, a["separacion_senales"], margen=R_fuera * 6):
+            if not en_recta(d):
+                continue
+            if con_banda:
+                res.piezas.anadir(mb, vec.marco_desde_eje(p, t, arriba))
+            if con_flecha and en_recta(d + avance) and d + avance < s[-1] - R_fuera * 3:
+                q = trazado.en_distancia(camino, d + avance)[0] if avance else p
+                res.piezas.anadir(mf, vec.marco_desde_eje(q, t, arriba))
     # Extremos.
     t0 = vec.unitario(vec.resta(camino[0], camino[1]))
     t1 = vec.unitario(vec.resta(camino[-1], camino[-2]))
@@ -854,7 +890,10 @@ def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
         for p, t, d in trazado.uniforme(camino, separacion, margen=R_fuera * 3):
             if not en_recta(d):
                 continue
-            golpe = cercano(p, t)
+            if a["soportes_hacia"] == "cercana":
+                golpe = cercano(p, t)
+            else:
+                golpe = cercano(p, t, (0.0, 1.0, 0.0) if a["soportes_hacia"] == "techo" else (0.0, -1.0, 0.0))
             if golpe is None:
                 continue
             contacto, normal = golpe

@@ -30,6 +30,8 @@ ENUMS = {
     "extremos": piezas.EXTREMOS_TUBERIA,
     "arriba": construir.EJES,
     "norma": construir.NORMAS,
+    "soportesHacia": construir.SOPORTES_HACIA,
+    "senales": piezas.SENALES,
 }
 NUMEROS = [
     # atributo, clave, tipo, mínimo, máximo suave
@@ -57,12 +59,14 @@ NUMEROS = [
     ("separacionSoportes", "separacion_soportes", "d", 0.0, 1000.0),
     ("soportesAuto", "soportes_auto", "b", None, None),
     ("alcanceSoportes", "alcance_soportes", "d", 1.0, 1000.0),
+    ("pendiente", "pendiente", "d", 0.0, 0.1),
+    ("separacionSenales", "separacion_senales", "d", 1.0, 2000.0),
 ]
 CLAVE_DE_ENUM = {
     "tipo": "tipo", "perfilCable": "perfil_cable", "modoTension": "modo_tension",
     "conectorInicio": "conector_inicio", "conectorFin": "conector_fin", "pieza": "pieza",
     "perfilTuberia": "perfil_tuberia", "recorrido": "recorrido", "codo": "codo", "extremos": "extremos",
-    "arriba": "arriba", "norma": "norma",
+    "arriba": "arriba", "norma": "norma", "soportesHacia": "soportes_hacia", "senales": "senales",
 }
 # Atributos de ajuste por orden, para la interfaz y los estilos.
 AJUSTES = list(ENUMS) + [n[0] for n in NUMEROS]
@@ -392,7 +396,9 @@ def _bajar(apoyos, eje=1):
 
 
 def _cercano(apoyos):
-    def cercano(p, _tangente):
+    def cercano(p, _tangente, direccion=None):
+        if direccion is not None:
+            return _rayo(apoyos, p, direccion)
         mejor, distancia = None, float("inf")
         punto = om.MPoint(*p)
         for fn, _acel in apoyos:
@@ -406,6 +412,29 @@ def _cercano(apoyos):
                 mejor, distancia = ((q.x, q.y, q.z), (n.x, n.y, n.z)), d
         return mejor
     return cercano
+
+
+def _rayo(apoyos, p, direccion):
+    """(punto, normal) de la primera superficie en ``direccion`` desde ``p``, o None."""
+    mejor, distancia = None, float("inf")
+    origen = om.MFloatPoint(*p)
+    rayo = om.MFloatVector(*direccion)
+    for fn, acel in apoyos:
+        try:
+            golpe = fn.closestIntersection(origen, rayo, om.MSpace.kWorld, 1e7, False, accelParams=acel)
+        except (RuntimeError, TypeError):
+            continue
+        if not golpe or golpe[0] is None:
+            continue
+        punto, d, cara = golpe[0], golpe[1], golpe[2]
+        if cara < 0 or d >= distancia:
+            continue
+        n = fn.getPolygonNormal(cara, om.MSpace.kWorld)
+        n.normalize()
+        if n.x * direccion[0] + n.y * direccion[1] + n.z * direccion[2] > 0:
+            n = -n  # la normal mira hacia la tubería
+        mejor, distancia = ((punto.x, punto.y, punto.z), (n.x, n.y, n.z)), d
+    return mejor
 
 
 def _cajas(apoyos):

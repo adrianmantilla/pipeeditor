@@ -534,3 +534,38 @@ def paralela(puntos, desplazamiento, radio_base, arriba=(0.0, 1.0, 0.0), lado=No
         radios[i] = radio_base - vec.punto(o1, d2)
     salida.append(vec.suma(puntos[-1], offs[-1]))
     return salida, radios
+
+
+def con_pendiente(puntos, pendiente):
+    """La polilínea con sus tramos horizontales bajando ``pendiente`` (0,02 = 2 %) hacia el final.
+
+    Los dos extremos no se mueven: lo que baja se compensa en el último tramo
+    vertical (así un desagüe llega a su bajante). Si no hay ningún tramo
+    vertical, no se puede inclinar sin mover un extremo y se deja igual.
+    Y es el eje vertical.
+    """
+    n = len(puntos)
+    if n < 3 or pendiente <= 0:
+        return list(puntos)
+
+    def horizontal(a, b):
+        return math.hypot(b[0] - a[0], b[2] - a[2])
+
+    verticales = [j for j in range(n - 1)
+                  if horizontal(puntos[j], puntos[j + 1]) < 1e-6 and abs(puntos[j + 1][1] - puntos[j][1]) > 1e-6]
+    if not verticales:
+        return list(puntos)
+    ultimo = verticales[-1]
+    H = [0.0]
+    for a, b in zip(puntos, puntos[1:]):
+        H.append(H[-1] + horizontal(a, b))
+    salida = [puntos[0]]
+    for i in range(1, n - 1):
+        x, y, z = puntos[i]
+        if i <= ultimo:
+            y -= pendiente * H[i]
+        else:
+            y += pendiente * (H[-1] - H[i])
+        salida.append((x, y, z))
+    salida.append(puntos[-1])
+    return salida

@@ -318,7 +318,10 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         activo("separacion_tubos", self.valor("tubos") > 1)
         auto = self.valor("soportes_auto")
         activo("separacion_soportes", not auto)
-        activo("alcance_soportes", auto or self.valor("separacion_soportes") > 0)
+        hay_soportes = auto or self.valor("separacion_soportes") > 0
+        activo("alcance_soportes", hay_soportes)
+        activo("soportes_hacia", hay_soportes)
+        activo("separacion_senales", self.valor("senales") != "ninguna")
         reposo = self.valor("reposo")
         for clave in ("rigidez", "ondulacion", "semilla"):
             activo(clave, reposo)
