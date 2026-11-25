@@ -105,6 +105,11 @@ def manguito(R, largo=None):
     return ml.cilindro(R * 1.16, -largo / 2.0, largo / 2.0, 16)
 
 
+def cordon(R):
+    """Cordón de soldadura alrededor de la tubería."""
+    return ml.metal(ml.toro(R * 1.03, R * 0.07, 20, 5))
+
+
 def faja(R):
     """Faja de la tubería aislada."""
     return ml.cilindro(R * 1.42, -R * 0.12, R * 0.12, 16)

@@ -11,8 +11,33 @@ from pipeeditor import malla as ml
 
 TIPOS = ("cable", "tuberia")
 MODOS_TENSION = ("holgura", "longitud")
-CODOS = ("curvado", "pieza")
+CODOS = ("curvado", "pieza", "soldado")
 EJES = ("y", "z")
+NORMAS = ("libre", "acero", "cobre")
+
+# Diámetros exteriores normalizados, en cm, con su espesor de pared.
+# Acero: tubo DN (EN 10255 / ISO 65, serie media). Cobre: EN 1057.
+MEDIDAS = {
+    "acero": ((2.13, 0.26), (2.69, 0.26), (3.37, 0.32), (4.24, 0.32), (4.83, 0.32), (6.03, 0.36),
+              (7.61, 0.36), (8.89, 0.40), (11.43, 0.45), (13.97, 0.50), (16.83, 0.50), (21.91, 0.63),
+              (27.30, 0.63), (32.39, 0.71)),
+    "cobre": ((1.0, 0.1), (1.2, 0.1), (1.5, 0.1), (1.8, 0.1), (2.2, 0.1), (2.8, 0.12), (3.5, 0.15),
+              (4.2, 0.15), (5.4, 0.2), (6.4, 0.2), (7.6, 0.2), (10.8, 0.25)),
+}
+
+
+def medida_normalizada(norma, grosor):
+    """(diámetro, pared) normalizados más cercanos a ``grosor``, o None si la norma es libre."""
+    tabla = MEDIDAS.get(norma)
+    if not tabla:
+        return None
+    return min(tabla, key=lambda m: abs(math.log(max(grosor, 1e-6) / m[0])))
+
+
+def separacion_soportes_auto(diametro):
+    """Separación entre soportes según el diámetro (como en las tablas de montaje de acero):
+    unos 1,8 m para DN15 y 5 m para DN200."""
+    return 110.0 * math.sqrt(max(diametro, 0.1)) + 20.0
 
 POR_DEFECTO = {
     "tipo": "cable",
@@ -43,13 +68,15 @@ POR_DEFECTO = {
     "separacion_bridas_haz": 0.0,
     # tuberías
     "perfil_tuberia": "redonda",
+    "norma": "libre",            # medidas normalizadas: libre, acero (DN) o cobre
     "recorrido": "z",
-    "radio_codo": 2.0,           # en diámetros de la tubería
+    "radio_codo": 1.5,           # en diámetros de la tubería (1,5 = codo de radio largo)
     "codo": "curvado",
     "separacion_bridas": 0.0,
     "extremos": "abiertos",
     "pared": 0.0,
     "separacion_soportes": 0.0,
+    "soportes_auto": False,      # separación de soportes según el diámetro
     "alcance_soportes": 60.0,
 }
 
@@ -370,13 +397,16 @@ def _sobre_suelo(camino, suelo, r):
 
 def _tuberia(a, anclajes, ruta, ruta_lineal, cercano):
     res = Resultado()
+    medida = medida_normalizada(a["norma"], a["grosor"])
+    if medida is not None:
+        a = dict(a, grosor=medida[0], pared=medida[1] if a["pared"] > 0 else 0.0)
     R = max(a["grosor"], 1e-4) / 2.0
     radio_codo = max(0.0, a["radio_codo"]) * 2.0 * R
     codos = []
     if ruta is not None and len(ruta) >= 2:
         camino = trazado.limpiar([tuple(p) for p in ruta]) if ruta_lineal else [tuple(p) for p in ruta]
         if ruta_lineal:
-            camino, codos = trazado.redondear(camino, radio_codo, pasos=8)
+            camino, codos = trazado.redondear(camino, radio_codo, pasos=14)
     elif len(anclajes) >= 2:
         salida = max(0.0, a["salida"])
         primero, ultimo = anclajes[0], anclajes[-1]
@@ -386,7 +416,7 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano):
         medio = trazado.recorrido_ortogonal(paradas, a["recorrido"])
         polilinea = ([primero.posicion] if salida > 0 else []) + medio + ([ultimo.posicion] if salida > 0 else [])
         polilinea = trazado.limpiar(polilinea)
-        camino, codos = trazado.redondear(polilinea, radio_codo, pasos=8)
+        camino, codos = trazado.redondear(polilinea, radio_codo, pasos=14)
     else:
         return res
     if len(camino) < 2:
@@ -410,6 +440,17 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano):
         for c in codos:
             res.piezas.anadir(m, vec.marco_desde_eje(c.inicio, c.tangente_inicio))
             res.piezas.anadir(m, vec.marco_desde_eje(c.fin, c.tangente_fin))
+    # Codos soldados: el codo es una pieza algo más gruesa, con un cordón de soldadura a cada lado.
+    if a["codo"] == "soldado":
+        cordon = piezas.cordon(R_fuera)
+        for c in codos:
+            tramo = camino[max(0, c.indice_inicio):c.indice_fin + 1]
+            if len(tramo) >= 2:
+                res.piezas.anadir(perfiles.cuerpo_tuberia(tramo, R_fuera * 1.045, a["perfil_tuberia"]
+                                                          if a["perfil_tuberia"] != "aislada" else "redonda",
+                                                          max(a["lados"], 8)))
+            res.piezas.anadir(cordon, vec.marco_desde_eje(c.inicio, c.tangente_inicio))
+            res.piezas.anadir(cordon, vec.marco_desde_eje(c.fin, c.tangente_fin))
     # Bridas: repartidas en los tramos rectos y a los dos lados de cada codo.
     if a["separacion_bridas"] > 0:
         b = piezas.brida_tuberia(R_fuera)
@@ -440,8 +481,9 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano):
         res.piezas.anadir(b, vec.marco_desde_eje(vec.suma(camino[0], vec.escala(t0, -R_fuera * 0.18)), t0))
         res.piezas.anadir(b, vec.marco_desde_eje(vec.suma(camino[-1], vec.escala(t1, -R_fuera * 0.18)), t1))
     # Soportes a la pared más cercana.
-    if a["separacion_soportes"] > 0 and cercano is not None:
-        for p, t, d in trazado.uniforme(camino, a["separacion_soportes"], margen=R_fuera * 3):
+    separacion = separacion_soportes_auto(2.0 * R) if a["soportes_auto"] else a["separacion_soportes"]
+    if separacion > 0 and cercano is not None:
+        for p, t, d in trazado.uniforme(camino, separacion, margen=R_fuera * 3):
             if not en_recta(d):
                 continue
             golpe = cercano(p, t)

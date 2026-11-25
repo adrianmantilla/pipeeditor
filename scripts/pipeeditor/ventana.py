@@ -314,7 +314,13 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         activo("torsion", haz)
         activo("separacion_bridas_haz", haz)
         activo("pared", self.valor("extremos") == "abiertos")
-        activo("alcance_soportes", self.valor("separacion_soportes") > 0)
+        auto = self.valor("soportes_auto")
+        activo("separacion_soportes", not auto)
+        activo("alcance_soportes", auto or self.valor("separacion_soportes") > 0)
+        reposo = self.valor("reposo")
+        for clave in ("rigidez", "ondulacion", "semilla"):
+            activo(clave, reposo)
+        activo("variacion", reposo and haz and self.valor("separacion_bridas_haz") <= 0)
 
     def _estado(self):
         if self.editando:

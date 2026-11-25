@@ -221,5 +221,13 @@
   "gancho_si": "El cable pasa por estos puntos sin atarse.",
   "gancho_no": "El cable vuelve a estar atado en estos puntos.",
   "material_metal": "Metal",
-  "material_laton": "Latón"
+  "material_laton": "Latón",
+  "opcion_codo_soldado": "Soldados",
+  "campo_norma": "Medidas",
+  "campo_norma_ayuda": "Libre: el grosor que pongas. Acero o cobre: el diámetro y la pared se ajustan al tubo normalizado más cercano (DN de acero o cobre EN 1057).",
+  "opcion_norma_libre": "Libres",
+  "opcion_norma_acero": "Tubo de acero (DN)",
+  "opcion_norma_cobre": "Tubo de cobre",
+  "campo_soportes_auto": "Separación según el diámetro",
+  "campo_soportes_auto_ayuda": "Pone los soportes a la distancia que se usa en montaje: unos 1,8 m en tubos finos y hasta 5 m en tubos gruesos."
 }

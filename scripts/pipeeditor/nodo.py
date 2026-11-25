@@ -29,6 +29,7 @@ ENUMS = {
     "codo": construir.CODOS,
     "extremos": piezas.EXTREMOS_TUBERIA,
     "arriba": construir.EJES,
+    "norma": construir.NORMAS,
 }
 NUMEROS = [
     # atributo, clave, tipo, mínimo, máximo suave
@@ -52,13 +53,14 @@ NUMEROS = [
     ("separacionBridas", "separacion_bridas", "d", 0.0, 1000.0),
     ("pared", "pared", "d", 0.0, 10.0),
     ("separacionSoportes", "separacion_soportes", "d", 0.0, 1000.0),
+    ("soportesAuto", "soportes_auto", "b", None, None),
     ("alcanceSoportes", "alcance_soportes", "d", 1.0, 1000.0),
 ]
 CLAVE_DE_ENUM = {
     "tipo": "tipo", "perfilCable": "perfil_cable", "modoTension": "modo_tension",
     "conectorInicio": "conector_inicio", "conectorFin": "conector_fin", "pieza": "pieza",
     "perfilTuberia": "perfil_tuberia", "recorrido": "recorrido", "codo": "codo", "extremos": "extremos",
-    "arriba": "arriba",
+    "arriba": "arriba", "norma": "norma",
 }
 # Atributos de ajuste por orden, para la interfaz y los estilos.
 AJUSTES = list(ENUMS) + [n[0] for n in NUMEROS]

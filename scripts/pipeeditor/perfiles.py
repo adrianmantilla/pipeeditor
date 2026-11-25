@@ -86,7 +86,7 @@ def cuerpo_cable(centros, radio, perfil="redondo", lados=8, cantidad=1, torsion=
     if len(centros) < 2:
         return ml.Malla()
     lados = max(3, int(lados))
-    detalle = {"trenzado": radio * 0.9, "corrugado": radio * 0.3, "espiral": radio * 0.6}.get(perfil)
+    detalle = {"trenzado": radio * 0.45, "corrugado": radio * 0.3, "espiral": radio * 0.6}.get(perfil)
     if cantidad > 1 and torsion:
         detalle = min(detalle or 1e9, 100.0 / max(abs(torsion), 1e-6) / 24.0)
     paso_final = paso if paso else detalle
@@ -109,25 +109,14 @@ def cuerpo_cable(centros, radio, perfil="redondo", lados=8, cantidad=1, torsion=
 
 def _un_cable(centros, marcos, radio, perfil, lados):
     if perfil == "doble":
-        m = ml.Malla()
-        for lado in (-1.0, 1.0):
-            ruta = _desplazar(centros, marcos, lambda i, s, lado=lado: (0.0, lado * radio * 0.98))
-            m.anadir(_tubo(ruta, radio, lados, marcos=trazado.marcos(ruta, marcos[0][1])))
-        return m
+        # Cable de lámpara: una sola funda en forma de 8, con el alma que une los dos conductores.
+        return _tubo(centros, radio, lados, perfil=ocho(radio, max(6, lados)), marcos=marcos)
     if perfil == "plano":
         forma = [(0.32 * radio * math.cos(2 * math.pi * k / lados), radio * math.sin(2 * math.pi * k / lados))
                  for k in range(lados)]
         return _tubo(centros, radio, lados, perfil=forma, marcos=marcos)
     if perfil == "trenzado":
-        m = ml.Malla()
-        vuelta = radio * 7.0  # largo de una vuelta de la trenza
-        for j in range(3):
-            def d(i, s, j=j):
-                a = 2 * math.pi * (s / vuelta + j / 3.0)
-                return (radio * 0.5 * math.cos(a), radio * 0.5 * math.sin(a))
-            ruta = _desplazar(centros, marcos, d)
-            m.anadir(_tubo(ruta, radio * 0.56, max(5, lados - 2), marcos=trazado.marcos(ruta, marcos[0][1])))
-        return m
+        return cuerda(centros, marcos, radio, lados)
     if perfil == "corrugado":
         periodo = radio * 1.2
         return _tubo(centros, radio, lados, marcos=marcos,
@@ -150,6 +139,53 @@ def _un_cable(centros, marcos, radio, perfil, lados):
             ruta.append(vec.suma(p, vec.suma(vec.escala(nn, espira * math.cos(a)), vec.escala(bb, espira * math.sin(a)))))
         return _tubo(ruta, alambre, max(5, lados - 2))
     return _tubo(centros, radio, lados, marcos=marcos)
+
+
+def ocho(radio, lados):
+    """Contorno en 8: dos círculos de ``radio`` (arriba y abajo) unidos por un alma estrecha."""
+    d = radio * 0.95            # distancia del centro de cada conductor al eje
+    w = radio * 0.42            # medio ancho del alma
+    ya = d - math.sqrt(radio * radio - w * w)
+    salida = []
+    for centro, signo in ((d, 1.0), (-d, -1.0)):
+        a0 = math.atan2((ya * signo) - centro, w * signo)
+        a1 = math.atan2((ya * signo) - centro, -w * signo)
+        if a1 <= a0:
+            a1 += 2 * math.pi
+        for k in range(lados + 1):
+            a = a0 + (a1 - a0) * k / float(lados)
+            salida.append((radio * math.cos(a), centro + radio * math.sin(a)))
+    return salida
+
+
+def cuerda(centros, marcos, radio, lados):
+    """Cuerda de tres cabos que se tocan, torcidos en hélice, con las fibras de cada cabo.
+
+    Tres cabos de radio rc tangentes entre sí y al círculo exterior: sus
+    centros quedan a 0,536·R del eje y rc = 0,464·R. Una vuelta de la cuerda
+    mide unas 3,5 veces su diámetro, como en una cuerda real. Las fibras
+    giran al revés que los cabos.
+    """
+    m = ml.Malla()
+    rc = radio * 0.464 * 1.04      # un poco de solape para que no se vean huecos
+    eje = radio * 0.536
+    vuelta = radio * 7.0
+    lados_cabo = max(8, lados)
+    s = vec.acumulada(centros)
+    for j in range(3):
+        def d(i, sd, j=j):
+            a = 2 * math.pi * (sd / vuelta + j / 3.0)
+            return (eje * math.cos(a), eje * math.sin(a))
+        ruta = _desplazar(centros, marcos, d)
+        marcos_ruta = trazado.marcos(ruta, marcos[0][1])
+
+        def anillo(i, j=j):
+            fase = 2 * math.pi * (-s[i] / (vuelta * 0.45) + j / 3.0)
+            return [(rc * (1.0 + 0.05 * math.cos(6 * t + fase)) * math.cos(t),
+                     rc * (1.0 + 0.05 * math.cos(6 * t + fase)) * math.sin(t))
+                    for t in (2 * math.pi * k / float(lados_cabo) for k in range(lados_cabo))]
+        m.anadir(ml.barrer(ruta, marcos_ruta, anillo))
+    return m
 
 
 # --- tuberías -------------------------------------------------------------------------
