@@ -274,3 +274,31 @@ def suavizar(puntos, partes=2):
                 0.5 * (2 * p1[c] + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2
                        + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3) for c in range(3)))
     return salida
+
+
+def adaptativo(puntos, paso_max, angulo=6.0, paso_min=0.0):
+    """Puntos de la polilínea repartidos según la curvatura.
+
+    Se queda con un punto cuando el giro acumulado desde el anterior pasa de
+    ``angulo`` grados o la distancia pasa de ``paso_max``. Así hay anillos de
+    sobra en las curvas y pocos en las rectas, con el mismo presupuesto.
+    """
+    pts = limpiar_repetidos(puntos)
+    if len(pts) < 3:
+        return pts
+    if paso_max > 0:
+        pts = remuestrear(pts, max(paso_max / 4.0, paso_min, 1e-6))
+    limite = math.radians(angulo)
+    salida = [pts[0]]
+    giro, recorrido = 0.0, 0.0
+    t_ant = vec.unitario(vec.resta(pts[1], pts[0]))
+    for i in range(1, len(pts) - 1):
+        recorrido += vec.distancia(pts[i - 1], pts[i])
+        t = vec.unitario(vec.resta(pts[i + 1], pts[i]))
+        giro += math.acos(max(-1.0, min(1.0, vec.punto(t_ant, t))))
+        t_ant = t
+        if (giro >= limite and recorrido >= paso_min) or (paso_max > 0 and recorrido >= paso_max - 1e-9):
+            salida.append(pts[i])
+            giro, recorrido = 0.0, 0.0
+    salida.append(pts[-1])
+    return salida

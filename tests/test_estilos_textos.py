@@ -26,7 +26,7 @@ class Estilos(unittest.TestCase):
                 self.assertIn(ajustes["perfil_cable"], perfiles.PERFILES_CABLE)
             else:
                 self.assertIn(ajustes["perfil_tuberia"], perfiles.PERFILES_TUBERIA)
-            for parte in ("material_cuerpo", "material_piezas"):
+            for parte in ("material_cuerpo", "material_piezas", "material_metal"):
                 if parte in a:
                     self.assertIn(a[parte], materiales_datos.MATERIALES)
 
@@ -76,7 +76,7 @@ class Textos(unittest.TestCase):
                   "insertar_punto", "quitar_punto", "seleccionar_anclas", "seleccionar_cuerpo", "hornear",
                   "borrar"):
             usadas |= {k, k + "_ayuda"}
-        usadas |= {"editando_uno", "editando_varios", "material_cuerpo", "material_piezas"}
+        usadas |= {"editando_uno", "editando_varios", "material_cuerpo", "material_piezas", "material_metal"}
         faltan = sorted(usadas - claves())
         self.assertEqual(faltan, [])
 

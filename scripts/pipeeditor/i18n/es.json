@@ -219,5 +219,7 @@
   "gancho": "Gancho",
   "gancho_ayuda": "Convierte los puntos elegidos en ganchos: el cable pasa por ellos deslizando, sin atarse, y reparte su longitud entre los dos lados. Vuelve a pulsar para atarlos.",
   "gancho_si": "El cable pasa por estos puntos sin atarse.",
-  "gancho_no": "El cable vuelve a estar atado en estos puntos."
+  "gancho_no": "El cable vuelve a estar atado en estos puntos.",
+  "material_metal": "Metal",
+  "material_laton": "Latón"
 }

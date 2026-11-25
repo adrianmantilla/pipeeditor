@@ -5,6 +5,7 @@ Cada cable o tubería es un grupo con este contenido:
     cable_01                (grupo; moverlo mueve sus anclajes libres)
       cable_01_cuerpo       (malla: la sale del nodo)
       cable_01_piezas       (malla: conectores, bridas, soportes)
+      cable_01_metal        (malla: las partes metálicas de las piezas)
       cable_01_curva        (curva central, oculta)
       cable_01_anclas       (localizadores que no están pegados a un objeto)
 
@@ -122,6 +123,12 @@ def formas_de(n):
     return destino("cuerpo"), destino("piezas"), destino("curva")
 
 
+def forma_de(n, parte):
+    """Forma de malla de ``parte`` (cuerpo, piezas o metal), o None."""
+    d = cmds.listConnections(n + "." + parte, destination=True, source=False, shapes=True) or []
+    return d[0] if d else None
+
+
 # --- crear ----------------------------------------------------------------------------
 
 def _crear_ancla(nombre, posicion, normal, padre, tamano):
@@ -173,16 +180,15 @@ def _crear_estructura(base, ajustes):
     cmds.connectAttr(n + ".message", grupo + "." + ATRIB_GRUPO)
     poner_ajustes([n], ajustes)
     tipo = ajustes.get("tipo", "cable")
-    for parte in ("cuerpo", "piezas"):
+    for parte in materiales.PARTES:
         t = cmds.createNode("transform", name="{}_{}".format(nombre, parte), parent=grupo)
         forma = cmds.createNode("mesh", name="{}_{}Shape".format(nombre, parte), parent=t)
         cmds.connectAttr("{}.{}".format(n, parte), forma + ".inMesh")
         cmds.setAttr(t + ".inheritsTransform", 0)
         for a in ("translate", "rotate", "scale"):
             cmds.setAttr("{}.{}".format(t, a), lock=True)
-        cuerpo_mat, piezas_mat = materiales.POR_TIPO.get(tipo, materiales.POR_TIPO["cable"])
-        materiales.asignar([forma], ajustes.get("material_" + parte) or (cuerpo_mat if parte == "cuerpo"
-                                                                         else piezas_mat))
+        defecto = materiales.POR_TIPO.get(tipo, materiales.POR_TIPO["cable"])[materiales.PARTES.index(parte)]
+        materiales.asignar([forma], ajustes.get("material_" + parte) or defecto)
     t = cmds.createNode("transform", name=nombre + "_curva", parent=grupo)
     curva = cmds.createNode("nurbsCurve", name=nombre + "_curvaShape", parent=t)
     cmds.connectAttr(n + ".curva", curva + ".create")
@@ -404,11 +410,10 @@ def leer_ajustes(n):
             opciones = nodo.ENUMS[atributo]
             v = opciones[max(0, min(len(opciones) - 1, int(v)))]
         salida[nodo.clave(atributo)] = v
-    cuerpo, piezas, _curva = formas_de(n)
-    if cuerpo:
-        salida["material_cuerpo"] = materiales.de(cuerpo)
-    if piezas:
-        salida["material_piezas"] = materiales.de(piezas)
+    for parte in materiales.PARTES:
+        forma = forma_de(n, parte)
+        if forma:
+            salida["material_" + parte] = materiales.de(forma)
     return salida
 
 
@@ -423,10 +428,7 @@ def informacion(n):
 
 
 def poner_material(nodos_, parte, nombre):
-    formas = []
-    for n in nodos_:
-        cuerpo, piezas, _ = formas_de(n)
-        formas.append(cuerpo if parte == "cuerpo" else piezas)
+    formas = [forma_de(n, parte) for n in nodos_]
     with Bloque():
         materiales.asignar(formas, nombre)
 
@@ -534,9 +536,10 @@ def hornear(nodos_):
         for n in nodos_:
             grupo = grupo_de(n)
             cuerpo, piezas, curva = formas_de(n)
+            metal = forma_de(n, "metal")
             anclas = anclas_de(n)
             ruta = cmds.listConnections(n + ".ruta", source=True, destination=False) or []
-            for forma in (cuerpo, piezas, curva):
+            for forma in (cuerpo, piezas, metal, curva):
                 if forma:
                     cmds.delete(forma, constructionHistory=True)
             if cmds.objExists(n):
@@ -544,8 +547,9 @@ def hornear(nodos_):
             for a in anclas:
                 if cmds.objExists(a):
                     cmds.delete(a)
-            if piezas and cmds.objExists(piezas) and not cmds.polyEvaluate(piezas, face=True):
-                cmds.delete(_transform_de_forma(piezas))
+            for forma in (piezas, metal):
+                if forma and cmds.objExists(forma) and not cmds.polyEvaluate(forma, face=True):
+                    cmds.delete(_transform_de_forma(forma))
             for r in ruta:  # la curva de unas aristas se queda como curva normal
                 if cmds.objExists(r):
                     cmds.delete(r, constructionHistory=True)

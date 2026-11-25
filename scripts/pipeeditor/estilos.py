@@ -39,7 +39,7 @@ DE_SERIE = {
 
 TUBERIA_POR_DEFECTO = {"grosor": 6.0, "lados": 16, "salida": 6.0}
 
-CLAVES_VALIDAS = set(construir.POR_DEFECTO) | {"material_cuerpo", "material_piezas"}
+CLAVES_VALIDAS = set(construir.POR_DEFECTO) | {"material_cuerpo", "material_piezas", "material_metal"}
 
 
 def limpiar(ajustes):

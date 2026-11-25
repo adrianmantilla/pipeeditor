@@ -188,6 +188,13 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None):
     else:
         return res
 
+    # Anillos según la curvatura: densos en las curvas, pocos en las rectas.
+    paso_max = 100.0 / max(1, a["segmentos_metro"])
+    paso_min = min(r * 0.3, paso_max)
+    camino = trazado.adaptativo(camino, paso_max, 6.0, paso_min)
+    res.hilos = [trazado.adaptativo(h, paso_max, 6.0, paso_min) for h in res.hilos]
+    if res.hilos:
+        res.hilos[0] = camino
     res.curva = camino
     res.longitud = vec.longitud_polilinea(camino)
     if res.hilos:

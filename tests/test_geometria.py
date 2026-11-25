@@ -126,7 +126,42 @@ class Mallas(unittest.TestCase):
     def test_cilindro(self):
         m = ml.cilindro(1, 0, 10, 8)
         comun.comprobar_malla(self, m)
-        self.assertEqual(m.num_caras, 8 + 16)
+        self.assertEqual(m.num_caras, 8 + 2)  # tapas de un solo polígono
+        # malla cerrada: cada arista con dos caras (se puede suavizar sin grietas)
+        aristas = {}
+        for cara in m.caras:
+            for a, b in zip(cara, cara[1:] + cara[:1]):
+                aristas[(min(a, b), max(a, b))] = aristas.get((min(a, b), max(a, b)), 0) + 1
+        self.assertTrue(all(v == 2 for v in aristas.values()))
+        self.assertEqual(len(m.duras), 16)  # los bordes de las dos tapas
+
+    def test_caja_cerrada_y_dura(self):
+        m = ml.caja(2, 4, 6)
+        self.assertEqual(len(m.vertices), 8)
+        self.assertEqual(len(set((min(a, b), max(a, b)) for a, b in m.duras)), 12)
+
+    def test_separar_metal(self):
+        m = ml.cilindro(1, 0, 1, 8)
+        m.anadir(ml.metal(ml.cilindro(0.5, 1, 2, 6)))
+        metal, resto = m.separar(ml.METAL), m.separar(0)
+        self.assertEqual(metal.num_caras, 6 + 2)
+        self.assertEqual(resto.num_caras, 8 + 2)
+        comun.comprobar_malla(self, metal)
+        self.assertEqual(len(metal.duras), 12)
+
+    def test_uv_en_unidades_reales(self):
+        # Un cable 4 veces más grueso tiene UV 4 veces más anchas: misma densidad.
+        fino, grueso = ml.cilindro(1, 0, 10, 8, tapas=False), ml.cilindro(4, 0, 10, 8, tapas=False)
+        self.assertAlmostEqual(max(u for u, _ in grueso.uvs) / max(u for u, _ in fino.uvs), 4.0)
+        self.assertAlmostEqual(max(v for _, v in fino.uvs), 10.0 / ml.ESCALA_UV)
+
+    def test_anillos_segun_curvatura(self):
+        from pipeeditor import trazado
+        recta = [(x, 0.0, 0.0) for x in range(0, 101)]
+        curva = [(10 * math.cos(a / 200.0 * math.pi), 10 * math.sin(a / 200.0 * math.pi), 0.0) for a in range(201)]
+        self.assertLessEqual(len(trazado.adaptativo(recta, 25.0)), 6)
+        # media vuelta de radio 10: al menos un anillo cada 6 grados
+        self.assertGreaterEqual(len(trazado.adaptativo(curva, 25.0)), 180 / 6.0 - 1)
 
     def test_toro_cerrado(self):
         comun.comprobar_malla(self, ml.toro(5, 1, 12, 6))
@@ -140,10 +175,10 @@ class Mallas(unittest.TestCase):
     def test_tapas_hacia_fuera(self):
         m = ml.cilindro(1, 0, 10, 8)
         # la última cara (tapa final) mira hacia +Y
-        a, b, c = [m.vertices[i] for i in m.caras[-1]]
+        a, b, c = [m.vertices[i] for i in m.caras[-1][:3]]
         normal = vec.cruz(vec.resta(b, a), vec.resta(c, b))
         self.assertGreater(normal[1], 0)
-        a, b, c = [m.vertices[i] for i in m.caras[8]]
+        a, b, c = [m.vertices[i] for i in m.caras[8][:3]]
         normal = vec.cruz(vec.resta(b, a), vec.resta(c, b))
         self.assertLess(normal[1], 0)
 

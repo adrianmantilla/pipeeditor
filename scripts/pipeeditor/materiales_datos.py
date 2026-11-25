@@ -17,13 +17,19 @@ MATERIALES = {
     "pvc_gris": ((0.35, 0.36, 0.37), 0.0, 0.4, 0.0),
     "aluminio": ((0.85, 0.86, 0.88), 1.0, 0.28, 0.0),
     "plastico_negro": ((0.03, 0.03, 0.03), 0.0, 0.3, 0.0),
+    "laton": ((0.91, 0.71, 0.38), 1.0, 0.3, 0.0),
 }
+# Partes de cada cable o tubería con su propio material.
+PARTES = ("cuerpo", "piezas", "metal")
+# material por defecto de cada parte (cuerpo, piezas, metal)
 POR_TIPO = {
-    "cable": ("goma_negra", "plastico_negro"),
-    "tuberia": ("cobre", "acero"),
+    "cable": ("goma_negra", "plastico_negro", "acero"),
+    "tuberia": ("cobre", "acero", "acero_galvanizado"),
 }
 CABLE = ("goma_negra", "pvc_blanco", "pvc_rojo", "pvc_amarillo", "nailon_azul", "canamo", "manguera_naranja",
          "cobre", "acero")
 TUBERIA = ("cobre", "pvc_gris", "pvc_blanco", "hierro_pintado", "acero_galvanizado", "aluminio", "oxido",
            "acero")
 PIEZAS = ("plastico_negro", "acero", "acero_galvanizado", "cobre", "oxido", "pvc_blanco")
+METAL = ("acero", "acero_galvanizado", "laton", "cobre", "aluminio", "oxido")
+LISTA = {"piezas": PIEZAS, "metal": METAL}

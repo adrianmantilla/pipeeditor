@@ -31,31 +31,32 @@ def conector(tipo, r, propia=None):
         m.anadir(ml.cilindro(2.6 * r, 0.0, 6.0 * r, 16))
         m.anadir(ml.cilindro(1.5 * r, 6.0 * r, 9.0 * r, 12, radio_final=1.15 * r))
         for lado in (-1, 1):
-            m.anadir(ml.cilindro(0.32 * r, -4.0 * r, 0.0, 6, desplazamiento=(lado * 1.2 * r, 0.0)))
+            m.anadir(ml.metal(ml.cilindro(0.32 * r, -4.0 * r, 0.0, 8, desplazamiento=(lado * 1.2 * r, 0.0))))
         return Conector(m, 9.0 * r)
     if tipo == "jack":
-        m.anadir(ml.cilindro(0.55 * r, -3.0 * r, 0.0, 8))
-        m.anadir(ml.cilindro(1.9 * r, 0.0, 1.2 * r, 14))
+        m.anadir(ml.metal(ml.cilindro(0.55 * r, -3.0 * r, 0.0, 8)))
+        m.anadir(ml.metal(ml.cilindro(1.9 * r, 0.0, 1.2 * r, 14)))
         m.anadir(ml.cilindro(1.5 * r, 1.2 * r, 7.0 * r, 14))
         m.anadir(ml.cilindro(1.2 * r, 7.0 * r, 9.5 * r, 10, radio_final=1.05 * r))
         return Conector(m, 9.5 * r)
     if tipo == "terminal":
-        m.anadir(ml.movida(ml.toro(1.6 * r, 0.45 * r, 14, 6), (0.0, 0.45 * r, 0.0)))
-        m.anadir(ml.cilindro(1.3 * r, 0.9 * r, 4.5 * r, 10))
+        m.anadir(ml.metal(ml.movida(ml.toro(1.6 * r, 0.45 * r, 14, 6), (0.0, 0.45 * r, 0.0))))
+        m.anadir(ml.metal(ml.cilindro(1.3 * r, 0.9 * r, 2.6 * r, 10)))
+        m.anadir(ml.cilindro(1.45 * r, 2.6 * r, 4.5 * r, 10, radio_final=1.1 * r))
         return Conector(m, 4.5 * r)
     if tipo == "gancho":
         aro = ml.toro(2.6 * r, 0.6 * r, 18, 8, arco=math.radians(290), inicio=math.radians(-55))
         # el toro está en XZ; se pone vertical (plano XY) y colgando bajo el anclaje
         aro = ml.girada(aro, (1, 0, 0), math.pi / 2)
-        m.anadir(ml.movida(aro, (0.0, -2.6 * r, 0.0)))
-        m.anadir(ml.cilindro(0.6 * r, 0.0, 3.5 * r, 8))
+        m.anadir(ml.metal(ml.movida(aro, (0.0, -2.6 * r, 0.0))))
+        m.anadir(ml.metal(ml.cilindro(0.6 * r, 0.0, 3.5 * r, 8)))
         return Conector(m, 3.5 * r)
     if tipo == "grillete":
         arco = ml.toro(2.0 * r, 0.55 * r, 12, 8, arco=math.pi, inicio=0.0)
         arco = ml.girada(arco, (1, 0, 0), -math.pi / 2)
-        m.anadir(arco)
+        m.anadir(ml.metal(arco))
         perno = ml.girada(ml.cilindro(0.6 * r, -2.6 * r, 2.6 * r, 8), (0, 0, 1), math.pi / 2)
-        m.anadir(perno)
+        m.anadir(ml.metal(perno))
         return Conector(m, 2.6 * r)
     if tipo == "propio" and propia is not None and not propia.vacia():
         _minimo, maximo = propia.caja()
@@ -70,7 +71,7 @@ def pieza_cable(tipo, r):
         m.anadir(ml.toro(r * 1.08, r * 0.14, 14, 4))
         m.anadir(ml.caja(r * 0.9, r * 0.5, r * 0.6, centro=(r * 1.35, 0.0, 0.0)))
     elif tipo == "anillo":
-        m.anadir(ml.toro(r * 1.15, r * 0.25, 14, 6))
+        m.anadir(ml.metal(ml.toro(r * 1.15, r * 0.25, 14, 6)))
     elif tipo == "etiqueta":
         m.anadir(ml.cilindro(r * 1.12, -r * 1.2, r * 1.2, 12))
         m.anadir(ml.caja(r * 0.15, r * 2.4, r * 3.2, centro=(r * 1.2, 0.0, r * 2.4)))
@@ -94,8 +95,8 @@ def brida_tuberia(R):
     m.anadir(ml.cilindro(R * 1.7, -R * 0.18, R * 0.18, 20))
     for k in range(6):
         a = 2 * math.pi * k / 6.0
-        m.anadir(ml.cilindro(R * 0.13, -R * 0.3, R * 0.3, 6,
-                             desplazamiento=(R * 1.42 * math.cos(a), R * 1.42 * math.sin(a))))
+        m.anadir(ml.metal(ml.cilindro(R * 0.13, -R * 0.3, R * 0.3, 6,
+                                      desplazamiento=(R * 1.42 * math.cos(a), R * 1.42 * math.sin(a)))))
     return m
 
 
@@ -123,14 +124,14 @@ def soporte(R, origen, tangente, contacto, normal_superficie):
     ``contacto`` el punto de la pared y ``normal_superficie`` su normal.
     """
     m = ml.Malla()
-    aro = ml.toro(R * 1.12, R * 0.12, 18, 5)
+    aro = ml.metal(ml.toro(R * 1.12, R * 0.12, 18, 5))
     m.anadir(aro, vec.marco_desde_eje(origen, tangente))
     hacia = vec.resta(contacto, origen)
     distancia = vec.largo(hacia)
     if distancia > R * 1.2:
         eje = vec.unitario(hacia)
-        varilla = ml.cilindro(R * 0.14, R * 1.12, distancia, 6)
+        varilla = ml.metal(ml.cilindro(R * 0.14, R * 1.12, distancia, 6))
         m.anadir(varilla, vec.marco_desde_eje(origen, eje, tangente))
-        placa = ml.cilindro(R * 0.55, 0.0, R * 0.16, 10)
+        placa = ml.metal(ml.cilindro(R * 0.55, 0.0, R * 0.16, 10))
         m.anadir(placa, vec.marco_desde_eje(contacto, normal_superficie, tangente))
     return m

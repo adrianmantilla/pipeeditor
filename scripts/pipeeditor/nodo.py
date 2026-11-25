@@ -143,6 +143,9 @@ class PipeEditorNodo(om.MPxNode):
         A["piezas"] = typ.create("piezas", "pie", om.MFnData.kMesh)
         typ.writable = False
         typ.storable = False
+        A["metal"] = typ.create("metal", "met", om.MFnData.kMesh)
+        typ.writable = False
+        typ.storable = False
         A["curva"] = typ.create("curva", "cur", om.MFnData.kNurbsCurve)
         typ.writable = False
         typ.storable = False
@@ -157,8 +160,8 @@ class PipeEditorNodo(om.MPxNode):
             num.writable = False
             num.storable = False
 
-        salidas = ["cuerpo", "piezas", "curva", "longitudesActuales", "longitudTotal", "caida", "triangulos",
-                   "tensos"]
+        salidas = ["cuerpo", "piezas", "metal", "curva", "longitudesActuales", "longitudTotal", "caida",
+                   "triangulos", "tensos"]
         entradas = [n for n in A if n not in salidas]
         for n in entradas + salidas:
             om.MPxNode.addAttribute(A[n])
@@ -169,8 +172,8 @@ class PipeEditorNodo(om.MPxNode):
     # --- cálculo ----------------------------------------------------------------------
     def compute(self, plug, datos):
         A = PipeEditorNodo.atributos
-        salidas = ("cuerpo", "piezas", "curva", "longitudesActuales", "longitudTotal", "caida", "triangulos",
-                   "tensos")
+        salidas = ("cuerpo", "piezas", "metal", "curva", "longitudesActuales", "longitudTotal", "caida",
+                   "triangulos", "tensos")
         if plug.isNull or om.MFnAttribute(plug.attribute()).name not in salidas:
             return None
         try:
@@ -179,7 +182,12 @@ class PipeEditorNodo(om.MPxNode):
             om.MGlobal.displayWarning("PipeEditor: {}".format(error))
             res = construir.Resultado()
         datos.outputValue(A["cuerpo"]).setMObject(_malla_maya(res.cuerpo))
-        datos.outputValue(A["piezas"]).setMObject(_malla_maya(res.piezas))
+        # Las escenas de antes no tienen la malla de metal: entonces va con las piezas.
+        con_metal = om.MPlug(self.thisMObject(), A["metal"]).isSource
+        metal = res.piezas.separar(ml.METAL) if con_metal else ml.Malla()
+        piezas = res.piezas.separar(0) if con_metal else res.piezas
+        datos.outputValue(A["piezas"]).setMObject(_malla_maya(piezas))
+        datos.outputValue(A["metal"]).setMObject(_malla_maya(metal))
         datos.outputValue(A["curva"]).setMObject(_curva_maya(res.curva))
         datos.outputValue(A["longitudesActuales"]).setMObject(
             om.MFnDoubleArrayData().create(om.MDoubleArray(res.longitudes)))
@@ -346,15 +354,34 @@ def _empujar(apoyos):
 
 
 def _malla_python(fn):
+    """Copia completa de una malla de Maya: vértices, caras, UV y aristas duras."""
     m = ml.Malla()
     m.vertices = [(p.x, p.y, p.z) for p in fn.getPoints()]
     cuentas, conexiones = fn.getVertices()
-    i = 0
-    for c in cuentas:
+    try:
+        us, vs = fn.getUVs()
+        cuentas_uv, ids_uv = fn.getAssignedUVs()
+    except RuntimeError:
+        us, vs, cuentas_uv, ids_uv = [], [], [], []
+    m.uvs = [(u, v) for u, v in zip(us, vs)]
+    centro = None
+    i = j = 0
+    for k, c in enumerate(cuentas):
         caras = tuple(conexiones[i:i + c])
+        if k < len(cuentas_uv) and cuentas_uv[k] == c:
+            uv = tuple(ids_uv[j:j + c])
+            j += c
+        else:
+            if centro is None:
+                centro = m.uv(0.5, 0.5)
+            uv = tuple(centro for _ in caras)
         m.caras.append(caras)
-        m.caras_uv.append(tuple(m.uv(0.5, 0.5) for _ in caras))
+        m.caras_uv.append(uv)
+        m.etiquetas.append(0)
         i += c
+    for e in range(fn.numEdges):
+        if not fn.isEdgeSmooth(e):
+            m.duras.append(tuple(fn.getEdgeVertices(e)))
     return m
 
 
@@ -368,16 +395,38 @@ def _malla_maya(malla):
     fn = om.MFnMesh()
     fn.create([om.MPoint(*p) for p in vertices], cuentas, conexiones, us, vs, parent=datos)
     fn.assignUVs(cuentas_uv, ids_uv)
-    aristas = list(range(fn.numEdges))
-    fn.setEdgeSmoothings(aristas, [True] * len(aristas))
+    total = fn.numEdges
+    suaves = [True] * total
+    duras = []
+    if malla.duras:
+        buscadas = set((min(a, b), max(a, b)) for a, b in malla.duras)
+        for e in range(total):
+            a, b = fn.getEdgeVertices(e)
+            if (min(a, b), max(a, b)) in buscadas:
+                suaves[e] = False
+                duras.append(e)
+    fn.setEdgeSmoothings(list(range(total)), suaves)
     fn.cleanupEdgeSmoothing()
+    if duras:
+        try:  # pliegue: la arista sigue viva al suavizar (tecla 3) o subdividir en Arnold
+            fn.setCreaseEdges(duras, [2.0] * len(duras))
+        except (RuntimeError, AttributeError, TypeError):
+            pass
     return datos
 
 
 def _curva_maya(puntos):
+    """Curva central cúbica que pasa por ``puntos`` (o lineal si son muy pocos)."""
     datos = om.MFnNurbsCurveData().create()
     if len(puntos) < 2:
         puntos = [(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
+    if len(puntos) >= 4:
+        try:
+            om.MFnNurbsCurve().createWithEditPoints([om.MPoint(*p) for p in puntos], 3, om.MFnNurbsCurve.kOpen,
+                                                   False, False, True, datos)
+            return datos
+        except (RuntimeError, TypeError):
+            pass
     cvs = om.MPointArray([om.MPoint(*p) for p in puntos])
     nudos = om.MDoubleArray([float(i) for i in range(len(puntos))])
     om.MFnNurbsCurve().create(cvs, nudos, 1, om.MFnNurbsCurve.kOpen, False, False, datos)

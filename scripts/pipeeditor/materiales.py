@@ -15,6 +15,8 @@ POR_TIPO = datos.POR_TIPO
 CABLE = datos.CABLE
 TUBERIA = datos.TUBERIA
 PIEZAS = datos.PIEZAS
+METAL = datos.METAL
+PARTES = datos.PARTES
 
 
 def _tipo():

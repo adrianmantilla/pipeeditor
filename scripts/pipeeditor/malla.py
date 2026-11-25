@@ -1,13 +1,26 @@
 """Mallas sencillas en listas de Python, listas para pasar a ``MFnMesh.create``.
 
 ``Malla`` guarda vértices, caras (índices de vértice), UV y, por cada cara,
-los índices de UV. Los vértices de la costura se comparten; solo las UV se
-duplican, así no aparecen aristas abiertas ni sombreados raros.
+los índices de UV. Los vértices se comparten siempre (también en el borde de
+las tapas), así la malla es cerrada y se puede suavizar (tecla 3) o
+subdividir en Arnold sin que se abran grietas. Las aristas que deben verse
+vivas (bordes de tapas, cantos de cajas) se guardan en ``duras``: en Maya
+quedan con arista dura y con pliegue (crease), para que sigan vivas al
+subdividir.
+
+Cada cara lleva una etiqueta de material: 0 = la pieza normal, 1 = metal.
+
+Las UV están en unidades reales: una unidad de UV son ``ESCALA_UV`` cm, igual
+en todos los cables y piezas, para que una textura que se repite tenga el
+mismo tamaño en todo.
 """
 
 import math
 
 from pipeeditor import vec
+
+ESCALA_UV = 10.0
+METAL = 1
 
 
 class Malla(object):
@@ -16,6 +29,8 @@ class Malla(object):
         self.caras = []
         self.uvs = []
         self.caras_uv = []
+        self.etiquetas = []
+        self.duras = []
 
     # --- construir -----------------------------------------------------------------
     def vertice(self, p):
@@ -26,14 +41,24 @@ class Malla(object):
         self.uvs.append((float(u), float(v)))
         return len(self.uvs) - 1
 
-    def cara(self, indices, indices_uv):
+    def cara(self, indices, indices_uv, etiqueta=0):
         if len(indices) < 3 or len(set(indices)) < 3:
             return
         self.caras.append(tuple(indices))
         self.caras_uv.append(tuple(indices_uv))
+        self.etiquetas.append(etiqueta)
+
+    def dura(self, a, b):
+        self.duras.append((a, b))
+
+    def _etiquetas(self):
+        if len(self.etiquetas) != len(self.caras):
+            self.etiquetas = (list(self.etiquetas) + [0] * len(self.caras))[:len(self.caras)]
+        return self.etiquetas
 
     def anadir(self, otra, transformacion=None):
         base_v, base_uv = len(self.vertices), len(self.uvs)
+        self._etiquetas()
         if transformacion is None:
             self.vertices.extend(otra.vertices)
         else:
@@ -41,7 +66,40 @@ class Malla(object):
         self.uvs.extend(otra.uvs)
         self.caras.extend(tuple(i + base_v for i in c) for c in otra.caras)
         self.caras_uv.extend(tuple(i + base_uv for i in c) for c in otra.caras_uv)
+        self.etiquetas.extend(otra._etiquetas())
+        self.duras.extend((a + base_v, b + base_v) for a, b in otra.duras)
         return self
+
+    def separar(self, etiqueta):
+        """Malla nueva solo con las caras de ``etiqueta`` (y sus vértices)."""
+        nueva = Malla()
+        mapa_v, mapa_uv = {}, {}
+        for cara, cara_uv, e in zip(self.caras, self.caras_uv, self._etiquetas()):
+            if e != etiqueta:
+                continue
+            ids = []
+            for i in cara:
+                if i not in mapa_v:
+                    mapa_v[i] = nueva.vertice(self.vertices[i])
+                ids.append(mapa_v[i])
+            ids_uv = []
+            for i in cara_uv:
+                if i not in mapa_uv:
+                    mapa_uv[i] = nueva.uv(*self.uvs[i])
+                ids_uv.append(mapa_uv[i])
+            nueva.cara(ids, ids_uv, e)
+        nueva.duras = [(mapa_v[a], mapa_v[b]) for a, b in self.duras if a in mapa_v and b in mapa_v]
+        return nueva
+
+    def copia(self, vertices=None):
+        nueva = Malla()
+        nueva.vertices = list(self.vertices) if vertices is None else vertices
+        nueva.caras = list(self.caras)
+        nueva.uvs = list(self.uvs)
+        nueva.caras_uv = list(self.caras_uv)
+        nueva.etiquetas = list(self._etiquetas())
+        nueva.duras = list(self.duras)
+        return nueva
 
     # --- consultar -----------------------------------------------------------------
     @property
@@ -68,6 +126,12 @@ class Malla(object):
             return (0, 0, 0), (0, 0, 0)
         xs, ys, zs = zip(*self.vertices)
         return (min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))
+
+
+def metal(malla):
+    """La misma malla, marcada como metal."""
+    malla.etiquetas = [METAL] * len(malla.caras)
+    return malla
 
 
 def unir(mallas):
@@ -104,10 +168,11 @@ def barrer(centros, marcos, anillo, tapas=True, escala_v=1.0, invertir=False):
         for x, y in perfiles[i]:
             fila.append(m.vertice(vec.suma(c, vec.suma(vec.escala(nn, x), vec.escala(bb, y)))))
         filas.append(fila)
+    perimetro = _perimetro(perfiles[0]) / ESCALA_UV
     uv_filas = []
     for i in range(n):
-        v = s[i] / escala_v if escala_v else 0.0
-        uv_filas.append([m.uv(k / float(lados), v) for k in range(lados + 1)])
+        v = s[i] / ESCALA_UV
+        uv_filas.append([m.uv(perimetro * k / float(lados), v) for k in range(lados + 1)])
     for i in range(n - 1):
         for k in range(lados):
             k2 = (k + 1) % lados
@@ -123,38 +188,36 @@ def barrer(centros, marcos, anillo, tapas=True, escala_v=1.0, invertir=False):
     return m
 
 
-def _tapa(m, fila, perfil, centro, marco, al_reves):
-    """Tapa plana en abanico, con UV planas.
+def _perimetro(perfil):
+    return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(perfil, perfil[1:] + perfil[:1]))
 
-    Usa sus propios vértices (copias del borde) para que el borde quede con
-    arista dura: así todas las aristas de la malla pueden ser suaves.
+
+def _tapa(m, fila, perfil, centro, marco, al_reves):
+    """Tapa plana: un polígono que comparte los vértices del borde, con UV planas.
+
+    El borde se marca como arista dura (y con pliegue al subdividir).
     """
-    radio = max(max(abs(x), abs(y)) for x, y in perfil) or 1.0
-    fila = [m.vertice(m.vertices[i]) for i in fila]
-    medio = m.vertice(centro)
-    uv_medio = m.uv(0.5, 0.5)
-    uvs = [m.uv(0.5 + 0.5 * x / radio, 0.5 + 0.5 * y / radio) for x, y in perfil]
-    lados = len(fila)
-    for k in range(lados):
-        k2 = (k + 1) % lados
-        caras = [medio, fila[k2], fila[k]]
-        ids = [uv_medio, uvs[k2], uvs[k]]
-        if al_reves:
-            caras.reverse()
-            ids.reverse()
-        m.cara(caras, ids)
+    uvs = [m.uv(0.5 + x / ESCALA_UV, 0.5 + y / ESCALA_UV) for x, y in perfil]
+    caras, ids = list(fila), list(uvs)
+    if not al_reves:
+        caras.reverse()
+        ids.reverse()
+    m.cara(caras, ids)
+    for k in range(len(fila)):
+        m.dura(fila[k], fila[(k + 1) % len(fila)])
 
 
 def anillo_entre(m, fila_fuera, fila_dentro, perfil_fuera, al_reves):
     """Corona entre dos anillos (borde de una tubería hueca)."""
     radio = max(max(abs(x), abs(y)) for x, y in perfil_fuera) or 1.0
-    fila_fuera = [m.vertice(m.vertices[i]) for i in fila_fuera]
-    fila_dentro = [m.vertice(m.vertices[i]) for i in fila_dentro]
     lados = len(fila_fuera)
-    uv_f = [m.uv(0.5 + 0.5 * math.cos(2 * math.pi * k / lados), 0.5 + 0.5 * math.sin(2 * math.pi * k / lados))
-            for k in range(lados)]
-    uv_d = [m.uv(0.5 + 0.35 * math.cos(2 * math.pi * k / lados), 0.5 + 0.35 * math.sin(2 * math.pi * k / lados))
-            for k in range(lados)]
+    uv_f = [m.uv(0.5 + radio * math.cos(2 * math.pi * k / lados) / ESCALA_UV,
+                 0.5 + radio * math.sin(2 * math.pi * k / lados) / ESCALA_UV) for k in range(lados)]
+    uv_d = [m.uv(0.5 + 0.8 * radio * math.cos(2 * math.pi * k / lados) / ESCALA_UV,
+                 0.5 + 0.8 * radio * math.sin(2 * math.pi * k / lados) / ESCALA_UV) for k in range(lados)]
+    for k in range(lados):
+        m.dura(fila_fuera[k], fila_fuera[(k + 1) % lados])
+        m.dura(fila_dentro[k], fila_dentro[(k + 1) % lados])
     for k in range(lados):
         k2 = (k + 1) % lados
         caras = [fila_fuera[k], fila_fuera[k2], fila_dentro[k2], fila_dentro[k]]
@@ -220,29 +283,27 @@ def caja(ancho, alto, fondo, centro=(0.0, 0.0, 0.0)):
     cx, cy, cz = centro
     esquinas = [(cx + sx * hx, cy + sy * hy, cz + sz * hz)
                 for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
-    # índice = (sx>0)*4 + (sy>0)*2 + (sz>0); cada cara con sus vértices (aristas duras)
+    # índice = (sx>0)*4 + (sy>0)*2 + (sz>0); vértices compartidos y las 12 aristas duras
+    ids_v = [m.vertice(p) for p in esquinas]
     caras = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
     for c in caras:
-        ids = [m.uv(0, 0), m.uv(1, 0), m.uv(1, 1), m.uv(0, 1)]
-        m.cara([m.vertice(esquinas[i]) for i in c], ids)
+        a, b, d = esquinas[c[0]], esquinas[c[1]], esquinas[c[3]]
+        ancho_c, alto_c = vec.distancia(a, b) / ESCALA_UV, vec.distancia(a, d) / ESCALA_UV
+        ids = [m.uv(0, 0), m.uv(ancho_c, 0), m.uv(ancho_c, alto_c), m.uv(0, alto_c)]
+        m.cara([ids_v[i] for i in c], ids)
+    for i in range(8):
+        for bit in (1, 2, 4):
+            j = i | bit
+            if j != i:
+                m.dura(ids_v[i], ids_v[j])
     return m
 
 
 def girada(malla, eje, angulo):
     """Copia de ``malla`` girada alrededor de ``eje`` (por el origen)."""
     eje = vec.unitario(eje)
-    nueva = Malla()
-    nueva.vertices = [vec.girar(p, eje, angulo) for p in malla.vertices]
-    nueva.caras = list(malla.caras)
-    nueva.uvs = list(malla.uvs)
-    nueva.caras_uv = list(malla.caras_uv)
-    return nueva
+    return malla.copia([vec.girar(p, eje, angulo) for p in malla.vertices])
 
 
 def movida(malla, desplazamiento):
-    nueva = Malla()
-    nueva.vertices = [vec.suma(p, desplazamiento) for p in malla.vertices]
-    nueva.caras = list(malla.caras)
-    nueva.uvs = list(malla.uvs)
-    nueva.caras_uv = list(malla.caras_uv)
-    return nueva
+    return malla.copia([vec.suma(p, desplazamiento) for p in malla.vertices])

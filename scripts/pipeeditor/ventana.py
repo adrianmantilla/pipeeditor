@@ -135,7 +135,9 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         # materiales
         self.material_cuerpo = QtWidgets.QComboBox()
         self.material_piezas = QtWidgets.QComboBox()
-        for combo, parte in ((self.material_cuerpo, "cuerpo"), (self.material_piezas, "piezas")):
+        self.material_metal = QtWidgets.QComboBox()
+        for combo, parte in ((self.material_cuerpo, "cuerpo"), (self.material_piezas, "piezas"),
+                             (self.material_metal, "metal")):
             combo.activated.connect(lambda _i, combo=combo, parte=parte: self._material(parte, combo))
             formularios["material"].addRow(QtWidgets.QLabel(t("material_" + parte)), combo)
         columna.addStretch(1)
@@ -225,6 +227,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         a["tipo"] = self.tipo
         a["material_cuerpo"] = self.material_cuerpo.currentData()
         a["material_piezas"] = self.material_piezas.currentData()
+        a["material_metal"] = self.material_metal.currentData()
         return a
 
     # --- estado -----------------------------------------------------------------------
@@ -274,10 +277,11 @@ class VentanaPipeEditor(QtWidgets.QWidget):
             self._cargando = False
 
     def _llenar_materiales(self, ajustes):
-        cuerpo_def, piezas_def = materiales.POR_TIPO[self.tipo]
+        cuerpo_def, piezas_def, metal_def = materiales.POR_TIPO[self.tipo]
         listas = ((self.material_cuerpo, materiales.CABLE if self.tipo == "cable" else materiales.TUBERIA,
                    ajustes.get("material_cuerpo") or cuerpo_def),
-                  (self.material_piezas, materiales.PIEZAS, ajustes.get("material_piezas") or piezas_def))
+                  (self.material_piezas, materiales.PIEZAS, ajustes.get("material_piezas") or piezas_def),
+                  (self.material_metal, materiales.METAL, ajustes.get("material_metal") or metal_def))
         for combo, nombres, actual in listas:
             combo.blockSignals(True)
             combo.clear()
@@ -361,7 +365,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         tipo = estilo.get("tipo", self.tipo)
         if self.editando:
             self.servicio.escribir(self.editando, estilo)
-            for parte in ("cuerpo", "piezas"):
+            for parte in materiales.PARTES:
                 if estilo.get("material_" + parte):
                     self.servicio.material(self.editando, parte, estilo["material_" + parte])
             self.refrescar()
