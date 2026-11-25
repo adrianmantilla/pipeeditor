@@ -323,6 +323,10 @@ class VentanaPipeEditor(QtWidgets.QWidget):
             activo(clave, reposo)
         activo("variacion", reposo and haz and self.valor("separacion_bridas_haz") <= 0)
 
+    def _hay_reposo(self):
+        comprobar = getattr(self.servicio, "reposo_disponible", None)
+        return comprobar() is not False if comprobar else True
+
     def _estado(self):
         if self.editando:
             info = self.servicio.informacion(self.editando)
@@ -333,6 +337,8 @@ class VentanaPipeEditor(QtWidgets.QWidget):
                 texto += " · " + t("estado_caida", caida=_metros(info["caida"]))
             if info.get("tensos"):
                 texto += "\n" + t("estado_tenso", n=info["tensos"])
+            if self.tipo == "cable" and not self._hay_reposo():
+                texto += "\n" + t("estado_sin_reposo")
             self.estado.setText(texto)
         else:
             self.cabecera.setText(t("nuevo_" + self.tipo))

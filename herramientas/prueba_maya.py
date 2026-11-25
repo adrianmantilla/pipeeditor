@@ -74,6 +74,11 @@ def caja_forma(objeto):
     return cmds.exactWorldBoundingBox(cmds.listRelatives(objeto, shapes=True, fullPath=True)[0])
 
 
+def nodo_enums():
+    from pipeeditor import nodo
+    return nodo.ENUMS
+
+
 def dentro_de(puntos, caja, margen=0.3):
     (x0, y0, z0, x1, y1, z1) = caja
     return [p for p in puntos if x0 + margen < p[0] < x1 - margen and y0 + margen < p[1] < y1 - margen
@@ -253,6 +258,21 @@ def main():
         # --- calidad de lo generado (v1.1) ---
         pruebas_calidad(cmds, escena, materiales, n)
         cmds.select(clear=True)
+
+        # --- escenas de la versión 1.0 (sin versión de datos) ---
+        from pipeeditor import construir
+        comprobar(cmds.getAttr(n + ".versionDatos") == construir.VERSION_DATOS, "los nodos nuevos guardan su versión")
+        viejo = escena.crear([((0, 50, 300), (0, 0, 1), None), ((300, 0, 500), (0, 1, 0), None)],
+                             {"tipo": "tuberia", "grosor": 4.0})
+        nv = escena.nodo_de(viejo)
+        cmds.setAttr(nv + ".versionDatos", 0)
+        cmds.setAttr(nv + ".recorrido", list(nodo_enums()["recorrido"]).index("pegado"))
+        migrados = escena.migrar_escena()
+        ajustes_viejo = escena.leer_ajustes(nv)
+        comprobar(migrados == 1 and ajustes_viejo["recorrido"] == "z" and not ajustes_viejo["reposo"]
+                  and cmds.getAttr(nv + ".versionDatos") == construir.VERSION_DATOS,
+                  "una escena de la 1.0 se mantiene como era (recorrido en Z, sin reposo)")
+        cmds.delete(viejo)
 
         # --- guardar y abrir ---
         ruta = os.path.join(temporal, "prueba_pipeeditor.ma")

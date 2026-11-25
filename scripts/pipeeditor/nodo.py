@@ -119,6 +119,10 @@ class PipeEditorNodo(om.MPxNode):
         typ.usesArrayDataBuilder = True
         typ.disconnectBehavior = om.MFnAttribute.kDelete
         A["conectorPropio"] = typ.create("conectorPropio", "cpr", om.MFnData.kMesh)
+        # Versión de los datos con la que se creó el nodo (0 = PipeEditor 1.0): ver construir.migrar.
+        A["versionDatos"] = num.create("versionDatos", "vda", om.MFnNumericData.kInt, 0)
+        num.keyable = False
+        num.channelBox = False
 
         for nombre, opciones in ENUMS.items():
             defecto = opciones.index(construir.POR_DEFECTO[CLAVE_DE_ENUM[nombre]])
@@ -225,6 +229,7 @@ class PipeEditorNodo(om.MPxNode):
             anclajes.append(construir.Anclaje(pos, normal, factores.get(indice, 1.0), longitudes.get(indice, 0.0),
                                               deslizan.get(indice, False)))
 
+        ajustes = construir.migrar(ajustes, datos.inputValue(A["versionDatos"]).asInt())
         ruta, lineal = _ruta(datos.inputValue(A["ruta"]), ajustes["segmentos_metro"])
         apoyos = []
         arr = datos.inputArrayValue(A["apoyos"])

@@ -177,6 +177,7 @@ def _crear_estructura(base, ajustes):
     grupo = cmds.group(empty=True, name=nombre)
     cmds.addAttr(grupo, longName=ATRIB_GRUPO, attributeType="message")
     n = cmds.createNode(nodo.NOMBRE, name=nombre + "_nodo")
+    cmds.setAttr(n + ".versionDatos", construir.VERSION_DATOS)
     cmds.connectAttr(n + ".message", grupo + "." + ATRIB_GRUPO)
     poner_ajustes([n], ajustes)
     tipo = ajustes.get("tipo", "cable")
@@ -400,6 +401,28 @@ def poner_ajustes(nodos_, ajustes):
             if cmds.getAttr(plug, lock=True) or cmds.listConnections(plug, source=True, destination=False):
                 continue
             cmds.setAttr(plug, v)
+
+
+def migrar_escena():
+    """Escribe en los nodos de versiones anteriores los ajustes con los que se hicieron.
+
+    El nodo ya calcula igual que entonces (``construir.migrar``); esto lo deja
+    escrito para que la ventana muestre lo que se ve y se pueda editar.
+    Devuelve cuántos nodos se han actualizado.
+    """
+    hechos = 0
+    for n in nodos():
+        version = cmds.getAttr(n + ".versionDatos")
+        if version >= construir.VERSION_DATOS:
+            continue
+        antes = leer_ajustes(n)
+        despues = construir.migrar(antes, version)
+        cambios = {k: v for k, v in despues.items() if antes.get(k) != v}
+        if cambios:
+            poner_ajustes([n], cambios)
+        cmds.setAttr(n + ".versionDatos", construir.VERSION_DATOS)
+        hechos += 1
+    return hechos
 
 
 def leer_ajustes(n):

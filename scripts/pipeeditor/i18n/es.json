@@ -236,5 +236,7 @@
   "campo_separacion_tubos": "Separación entre tuberías",
   "campo_separacion_tubos_ayuda": "Distancia entre los ejes de dos tuberías vecinas. 0 = automática (un poco más que su grosor).",
   "opcion_recorrido_pegado": "Junto a las superficies",
-  "opcion_conector_aislador": "Aislador"
+  "opcion_conector_aislador": "Aislador",
+  "estado_sin_reposo": "Sin reposo físico: este Maya no trae numpy. El cable cuelga como catenaria y se apoya sin física.",
+  "escena_migrada": "PipeEditor: {n} cables o tuberías de una versión anterior; se mantienen como estaban."
 }

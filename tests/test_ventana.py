@@ -120,6 +120,13 @@ class Ventana(unittest.TestCase):
         self.assertEqual(self.s.nodos["cable_01"]["holgura"], 0.3)
         self.assertIn("1.234", self.v.estado.text())
 
+    def test_aviso_sin_reposo(self):
+        self.v._crear_seleccion()
+        self.assertNotIn("numpy", self.v.estado.text())
+        self.s.reposo_disponible = lambda: False
+        self.v._estado()
+        self.assertIn("numpy", self.v.estado.text())
+
     def test_longitud_fija(self):
         self.v._crear_seleccion()
         self.v.poner_valor("modo_tension", "longitud")

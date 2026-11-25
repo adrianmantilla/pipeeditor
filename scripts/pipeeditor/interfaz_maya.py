@@ -49,6 +49,10 @@ class ServicioMaya(object):
     def leer(self, n):
         return escena.leer_ajustes(n)
 
+    def reposo_disponible(self):
+        from pipeeditor import reposo
+        return reposo.disponible()
+
     def informacion(self, nodos):
         total = {"longitud": 0.0, "caida": 0.0, "triangulos": 0, "tensos": 0}
         for n in nodos:
@@ -315,6 +319,16 @@ def _avisar_al_guardar(*_):
         om.MGlobal.displayInfo(t("aviso_guardar_texto", n=vivos))
 
 
+def _al_abrir():
+    try:
+        n = escena.migrar_escena()
+        if n:
+            om.MGlobal.displayInfo(t("escena_migrada", n=n))
+    except Exception as error:  # nunca impedir abrir una escena
+        om.MGlobal.displayWarning("PipeEditor: {}".format(error))
+    refrescar()
+
+
 def iniciar():
     try:
         cmds.selectPref(trackSelectionOrder=True)
@@ -325,7 +339,8 @@ def iniciar():
         return
     _crear_menu()
     _estado["trabajos"] = [cmds.scriptJob(event=["SelectionChanged", refrescar]),
-                           cmds.scriptJob(event=["SceneOpened", refrescar])]
+                           cmds.scriptJob(event=["SceneOpened", _al_abrir])]
+    _al_abrir()
     _estado["avisos"] = [om.MSceneMessage.addCallback(om.MSceneMessage.kBeforeSave, _avisar_al_guardar)]
 
 

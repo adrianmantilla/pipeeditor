@@ -21,11 +21,21 @@ Los puntos son localizadores amarillos. Si «Pegar los extremos a los objetos» 
 
 1. Pulsa **Tuberías** arriba.
 2. Haz clic en la pared donde empieza y donde acaba. La tubería sale recta de la pared y va en ángulo recto.
-3. En **Recorrido** elige *En Z*, *En L* o *En línea recta*.
-4. Pon **Bridas cada** 100 cm y **Soportes cada** 80 cm.
-5. Selecciona la tubería y la pared y pulsa **Paredes para los soportes**: las abrazaderas se estiran hasta la pared.
+3. En **Recorrido**, *Junto a las superficies* va pegada a la pared y al suelo. *Esquivando objetos* rodea lo que elijas como apoyo (por ejemplo, un pilar) sin separarse de la pared.
+4. En **Medidas** elige *Acero* o *Cobre* para que el grosor sea una medida comercial.
+5. Marca **Separación según el diámetro** para los soportes.
+6. Selecciona la tubería y la pared y pulsa **Apoyar en los objetos seleccionados**: las abrazaderas se estiran hasta la pared.
+7. Para varias en paralelo, sube **Tuberías en paralelo**.
 
 También puedes seleccionar una fila de aristas de un modelo (por ejemplo, el borde de un tejado) y pulsar **Desde aristas**.
+
+## Un cable que se asienta
+
+1. Selecciona el cable y los objetos sobre los que cae (mesa, suelo, cajas) y pulsa **Apoyar en los objetos seleccionados**.
+2. Con **Reposo físico** marcado (viene así), el cable se tumba encima, cae por los bordes y no atraviesa nada.
+3. **Rigidez**: baja para un cable de lámpara blando, sube para una manguera gruesa.
+4. **Ondulación** le da memoria de bobina; **Semilla** prueba otra variante con la misma forma general.
+5. Para que el cable pase por un punto sin atarse (un clavo, una argolla), selecciona ese anclaje y pulsa **Gancho**.
 
 ## Trucos
 

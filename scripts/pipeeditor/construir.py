@@ -52,7 +52,7 @@ POR_DEFECTO = {
     # reposo físico (cables)
     "reposo": True,
     "rigidez": 0.3,              # 0 = cuerda floja, 1 = cable duro
-    "ondulacion": 0.0,           # memoria de bobina: ondas laterales
+    "ondulacion": 0.2,           # memoria de bobina: ondas laterales
     "variacion": 0.0,            # diferencias de holgura entre cables de un haz
     "semilla": 0,
     # cables
@@ -108,6 +108,24 @@ class Resultado(object):
 
     def triangulos(self):
         return self.cuerpo.triangulos() + self.piezas.triangulos()
+
+
+VERSION_DATOS = 1  # sube cada vez que un valor por defecto cambia lo que sale
+
+
+def migrar(a, version):
+    """Ajustes de un nodo guardado con una versión anterior, para que salga igual que entonces.
+
+    Maya no guarda los atributos que están en su valor por defecto: si un
+    defecto cambia, una escena antigua cambiaría al abrirla. Aquí se ponen los
+    defectos que tenía cada versión.
+    """
+    a = dict(a)
+    if version < 1:  # PipeEditor 1.0: sin reposo; las tuberías iban en Z
+        a["reposo"] = False
+        if a.get("recorrido") == "pegado":
+            a["recorrido"] = "z"
+    return a
 
 
 def ajustes(**cambios):
