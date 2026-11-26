@@ -30,14 +30,18 @@ Para desinstalar, borra `pipeeditor.mod` de la carpeta `modules` de tus preferen
 - **Puntos intermedios**: insertar o quitar anclajes; cada tramo tiene su propia holgura (atributo *Holgura de este tramo* del anclaje).
 
 ### Tuberías
-- **Trazado en ángulo recto**: junto a las superficies (de la pared al suelo baja por la pared y sigue por el suelo), esquivando objetos sin separarse de la pared, en Z, en L o en línea recta.
-- **Medidas normalizadas** de acero (DN) y cobre (EN 1057).
+- **Trazado en ángulo recto**: junto a las superficies (de la pared al suelo baja por la pared y sigue por el suelo), esquivando objetos por su forma real sin separarse de la pared, en Z, en L o en línea recta.
+- **Medidas normalizadas** de acero (DN y ANSI), cobre (EN 1057), PVC y multicapa.
 - **Varias en paralelo** (rack), apiladas a lo largo de la pared.
 - **Desde aristas o curvas**: sigue el borde de un modelo o una curva, y se actualiza si los editas.
 - **Codos** curvados (radio largo de 1,5 diámetros por defecto), con pieza de unión o soldados con cordón.
 - **Bridas** repartidas en los tramos rectos y a los dos lados de cada codo.
 - **Soportes a la pared**: abrazadera, varilla y placa hasta la superficie más cercana, a la separación que toca por el diámetro.
 - **Perfiles**: redonda, cuadrada (conducto), corrugada (flexible) y aislada. Pared visible en los extremos abiertos; también tapón o brida.
+- **Accesorios**: válvulas de bola y de compuerta, tes con derivación y reducciones en cualquier anclaje.
+- **Pendiente** para desagües, **soportes** a la pared, colgados del techo o apoyados en el suelo, y **señales** (flechas de sentido y bandas de color).
+- **Más normas**: PVC a presión y de desagüe, multicapa y acero ANSI.
+- **Lista de materiales** en CSV para una hoja de cálculo.
 
 ### Para los dos
 - Todo sigue **vivo**: los extremos son localizadores amarillos; muévelos, anímalos o mueve el objeto al que están pegados y el cable se recalcula.

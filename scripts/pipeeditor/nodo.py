@@ -11,7 +11,7 @@ import math
 
 import maya.api.OpenMaya as om
 
-from pipeeditor import construir, piezas, perfiles, trazado
+from pipeeditor import apoyo, construir, piezas, perfiles, trazado
 from pipeeditor import malla as ml
 
 NOMBRE = "pipeEditorNodo"
@@ -294,7 +294,8 @@ class PipeEditorNodo(om.MPxNode):
         bajar = _bajar(apoyos, eje) if apoyos else None
         cercano = _cercano(apoyos) if apoyos else None
         empujar = _empujar(apoyos) if apoyos and ajustes["tipo"] == "cable" else None
-        obstaculos = _cajas(apoyos) if apoyos and ajustes["tipo"] == "tuberia" else []
+        obstaculos = (_cajas(apoyos, self._cache) if apoyos and ajustes["tipo"] == "tuberia"
+                      and ajustes["recorrido"] == "esquivar" else [])
         return construir.construir(ajustes, anclajes, ruta=ruta, ruta_lineal=lineal, bajar=bajar,
                                    cercano=cercano, malla_propia=propio, empujar=empujar, obstaculos=obstaculos,
                                    cache=self._cache)
@@ -452,17 +453,32 @@ def _rayo(apoyos, p, direccion):
     return mejor
 
 
-def _cajas(apoyos):
-    """Caja (mínimo, máximo) de cada malla de apoyo, en coordenadas de escena."""
+def _cajas(apoyos, cache=None):
+    """Cajas (mínimo, máximo) que cubren la forma de cada malla de apoyo, en coordenadas de escena.
+
+    Una mesa da su tablero y sus patas, no una caja entera (ver
+    ``apoyo.cajas_de_malla``). Se guardan en ``cache`` mientras los apoyos no
+    cambien.
+    """
+    if cache is not None and cache.get("cajas_firma") == cache.get("firma_apoyos"):
+        return cache["cajas"]
     salida = []
     for fn, _acel in apoyos:
         try:
             pts = fn.getPoints(om.MSpace.kWorld)
         except RuntimeError:
             pts = fn.getPoints()
-        if len(pts):
-            xs, ys, zs = [p.x for p in pts], [p.y for p in pts], [p.z for p in pts]
+        if not len(pts):
+            continue
+        puntos = [(p.x, p.y, p.z) for p in pts]
+        try:
+            _cuantos, indices = fn.getTriangles()
+            salida.extend(apoyo.cajas_de_malla(puntos, list(indices)))
+        except Exception:  # sin numpy u otra malla rara: la caja entera
+            xs, ys, zs = zip(*puntos)
             salida.append(((min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))))
+    if cache is not None:
+        cache["cajas_firma"], cache["cajas"] = cache.get("firma_apoyos"), salida
     return salida
 
 

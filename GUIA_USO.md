@@ -27,6 +27,10 @@ Los puntos son localizadores amarillos. Si «Pegar los extremos a los objetos» 
 6. Selecciona la tubería y la pared y pulsa **Apoyar en los objetos seleccionados**: las abrazaderas se estiran hasta la pared.
 7. Para varias en paralelo, sube **Tuberías en paralelo**.
 
+8. **Válvulas y tes**: selecciona un anclaje de la tubería (con **Insertar punto** añades uno) y elige en **Accesorio en el punto**. Para una rama, selecciona el anclaje y después adónde va, y pulsa **Derivar (te)**.
+9. **Desagüe**: sube la **Pendiente** (1 a 2 %). Baja desde el primer anclaje hacia el último.
+10. **Lista de materiales**: menú **PipeEditor → Lista de materiales (CSV)…**.
+
 También puedes seleccionar una fila de aristas de un modelo (por ejemplo, el borde de un tejado) y pulsar **Desde aristas**.
 
 ## Un cable que se asienta

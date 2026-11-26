@@ -2,6 +2,20 @@
 
 Las escenas guardadas con una versión anterior se abren igual que se hicieron: PipeEditor guarda en cada nodo la versión de sus datos y, al abrir, mantiene los valores con los que se crearon.
 
+## 1.3.0
+
+### Tuberías de instalación
+- **Accesorios en los anclajes** (Editar > Accesorio en el punto): válvula de bola, válvula de compuerta, te y reducción. Una reducción intermedia hace que la tubería siga con la medida siguiente más pequeña; en un extremo deja la salida más fina.
+- **Derivar (te)**: selecciona un anclaje de la tubería y adónde va la rama; pone la te y crea la otra tubería, que se mueve con ese anclaje.
+- **Pendiente** para desagües: los tramos horizontales bajan hacia el último anclaje y la bajante lo compensa.
+- **Soportes hacia** la superficie más cercana, **colgados del techo** con varilla o **apoyados en el suelo**.
+- **Señales**: flechas de sentido y bandas de color.
+- **Normas** nuevas: PVC a presión (EN 1452), PVC de desagüe (EN 1329), multicapa (PEX-AL-PEX) y acero ANSI Schedule 40.
+- **Esquivar la forma real**: con «Esquivando objetos», una mesa cuenta como tablero y patas, no como una caja entera; la tubería puede pasar por debajo.
+
+### Lista de materiales
+- **PipeEditor > Lista de materiales (CSV)…**: metros de tubo y de cable por diámetro, norma y material; codos, bridas, soportes, válvulas, tes, reducciones, tapones y conectores. Se abre en Excel o LibreOffice.
+
 ## 1.2.0
 
 ### Para escenas grandes

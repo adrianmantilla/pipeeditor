@@ -155,3 +155,46 @@ class ListaMateriales(unittest.TestCase):
         primera, segunda = texto.splitlines()[:2]
         self.assertEqual(len(primera.split(";")), 7)
         self.assertIn("12,00", texto)
+
+
+def _caja_malla(lo, hi, P, T):
+    b = len(P)
+    x0, y0, z0 = lo
+    x1, y1, z1 = hi
+    P += [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1),
+          (x0, y1, z1)]
+    for f in ((0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+        T += [(b + f[0], b + f[1], b + f[2]), (b + f[0], b + f[2], b + f[3])]
+
+
+try:
+    import numpy  # noqa: F401
+    HAY_NUMPY = True
+except ImportError:  # pragma: no cover
+    HAY_NUMPY = False
+
+
+@unittest.skipIf(not HAY_NUMPY, "sin numpy")
+class FormaReal(unittest.TestCase):
+    def setUp(self):
+        from pipeeditor import apoyo
+        P, T = [], []
+        _caja_malla((0, 72, 0), (200, 80, 100), P, T)  # tablero
+        for x in (0, 195):
+            for z in (0, 95):
+                _caja_malla((x, 0, z), (x + 5, 72, z + 5), P, T)  # patas
+        self.mesa = apoyo.cajas_de_malla(P, T)
+        self.entera = [((0.0, 0.0, 0.0), (200.0, 80.0, 100.0))]
+
+    def test_la_mesa_son_tablero_y_patas(self):
+        self.assertGreater(len(self.mesa), 2)
+        bajo = [c for c in self.mesa if c[0][0] < 100 < c[1][0] and c[0][1] < 30]
+        self.assertEqual(bajo, [])  # debajo del tablero, en medio, no hay nada
+
+    def test_la_tuberia_pasa_por_debajo_de_la_mesa(self):
+        an = [c.Anclaje((-100, 30, 50), (1, 0, 0)), c.Anclaje((300, 30, 50), (-1, 0, 0))]
+        a = {"tipo": "tuberia", "recorrido": "esquivar", "grosor": 4.0, "salida": 0.0}
+        forma = c.construir(a, an, obstaculos=self.mesa)
+        caja = c.construir(a, an, obstaculos=self.entera)
+        self.assertLess(max(p[1] for p in forma.curva), 40)  # recta por debajo
+        self.assertLess(forma.longitud, caja.longitud)

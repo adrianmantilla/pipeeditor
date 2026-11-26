@@ -326,7 +326,7 @@ def _dentro(p, caja):
     return all(lo[k] < p[k] < hi[k] for k in range(3))
 
 
-def esquivar(p, q, obstaculos, holgura, penalizacion_codo=None, maximo=60):
+def esquivar(p, q, obstaculos, holgura, penalizacion_codo=None, maximo=80):
     """Recorrido en ángulo recto de ``p`` a ``q`` que no atraviesa ``obstaculos``.
 
     ``obstaculos``: cajas (mínimo, máximo) de los objetos; se hinchan
@@ -354,7 +354,10 @@ def esquivar(p, q, obstaculos, holgura, penalizacion_codo=None, maximo=60):
         for k in range(3):
             zona_lo[k] = min(zona_lo[k], lo[k])
             zona_hi[k] = max(zona_hi[k], hi[k])
-    cajas = cajas[:maximo]
+    if len(cajas) > maximo:  # las más cercanas al recorrido
+        medio = [(p[k] + q[k]) / 2.0 for k in range(3)]
+        cajas.sort(key=lambda c: sum(max(c[0][k] - medio[k], medio[k] - c[1][k], 0.0) ** 2 for k in range(3)))
+        cajas = cajas[:maximo]
     if not any(_corta(a, b, c) for c in cajas for a, b in zip([p] + ortogonal(p, q, "z"),
                                                                ortogonal(p, q, "z") + [q])):
         return None  # el recorrido normal ya está libre
