@@ -16,6 +16,7 @@ CABLE = datos.CABLE
 TUBERIA = datos.TUBERIA
 PIEZAS = datos.PIEZAS
 METAL = datos.METAL
+EMISION = datos.EMISION
 PARTES = datos.PARTES
 
 

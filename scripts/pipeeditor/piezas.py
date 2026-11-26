@@ -191,7 +191,7 @@ def tapon(R):
 
 
 def largo_flecha(R):
-    return max(R * 6.0, 8.0)
+    return max(R * 8.0, 15.0)
 
 
 def flecha(R):
@@ -206,7 +206,7 @@ def flecha(R):
         dentro = [(radio, mitad - 2 * mitad * k / pasos) for k in range(pasos + 1)]
         return [(r * math.cos(a), -r * math.sin(a)) for r, a in fuera + dentro]
 
-    cuerpo, cabeza = math.radians(11.0), math.radians(26.0)
+    cuerpo, cabeza = math.radians(18.0), math.radians(42.0)
     y0, y1, y2 = -largo / 2.0, largo * 0.1, largo / 2.0
     centros = [(0.0, y0, 0.0), (0.0, y1, 0.0), (0.0, y1, 0.0), (0.0, y2, 0.0)]
     anchos = [cuerpo, cuerpo, cabeza, math.radians(0.5)]
@@ -221,14 +221,16 @@ def banda(R):
 
 
 def valvula_bola(R):
-    """Válvula de bola: cuerpo, tuercas y maneta. Eje de la tubería en Y; la maneta, hacia +X."""
+    """Válvula de bola: cuerpo abombado, tuercas y maneta. Eje de la tubería en Y; la maneta, hacia +X."""
     m = ml.Malla()
-    m.anadir(ml.metal(ml.cilindro(R * 1.5, -R * 1.3, R * 1.3, 20)))
+    m.anadir(ml.metal(ml.cilindro(R * 1.25, -R * 1.4, 0.0, 20, radio_final=R * 1.75)))
+    m.anadir(ml.metal(ml.cilindro(R * 1.75, 0.0, R * 1.4, 20, radio_final=R * 1.25)))
     for signo in (-1.0, 1.0):
-        y0, y1 = sorted((signo * R * 1.25, signo * R * 2.1))
-        m.anadir(ml.metal(ml.cilindro(R * 1.32, y0, y1, 6)))
-    m.anadir(ml.metal(ml.cilindro(R * 0.28, R * 1.2, R * 2.15, 10)), _EJE_X)
-    m.anadir(ml.caja(R * 0.32, R * 3.8, R * 0.7, centro=(R * 2.3, R * 1.3, 0.0)))
+        y0, y1 = sorted((signo * R * 1.35, signo * R * 2.2))
+        m.anadir(ml.metal(ml.cilindro(R * 1.38, y0, y1, 6)))
+    m.anadir(ml.metal(ml.cilindro(R * 0.3, R * 1.5, R * 2.5, 10)), _EJE_X)
+    # maneta: larga, plana y a lo largo de la tubería (abierta)
+    m.anadir(ml.caja(R * 0.45, R * 5.0, R * 0.9, centro=(R * 2.65, R * 1.7, 0.0)))
     return m
 
 
@@ -252,11 +254,15 @@ def valvula_compuerta(R):
 
 
 def te(R, largo_rama=None):
-    """Te: manguito a lo largo de la tubería (Y) y salida hacia +X."""
-    largo_rama = largo_rama if largo_rama is not None else R * 1.7
+    """Te: cuerpo a lo largo de la tubería (Y) con su salida hacia +X, del mismo grueso."""
+    largo_rama = largo_rama if largo_rama is not None else R * 2.3
     m = ml.Malla()
-    m.anadir(ml.cilindro(R * 1.16, -R * 1.35, R * 1.35, 20))
-    m.anadir(ml.cilindro(R * 1.16, R * 0.6, largo_rama, 20), _EJE_X)
+    m.anadir(ml.cilindro(R * 1.22, -R * 2.0, R * 2.0, 20))
+    m.anadir(ml.cilindro(R * 1.22, 0.0, largo_rama, 20), _EJE_X)
+    for signo in (-1.0, 1.0):  # rebordes de los tres extremos
+        y0, y1 = sorted((signo * R * 1.75, signo * R * 2.05))
+        m.anadir(ml.cilindro(R * 1.32, y0, y1, 20))
+    m.anadir(ml.cilindro(R * 1.32, largo_rama - R * 0.3, largo_rama + R * 0.05, 20), _EJE_X)
     return m
 
 

@@ -48,7 +48,7 @@ También puedes seleccionar una fila de aristas de un modelo (por ejemplo, el bo
 - **Un tramo más flojo**: selecciona su anclaje y sube *Holgura de este tramo* en el Channel Box.
 - **Para animar**: pon *Al mover un extremo* en **Longitud fija**; al separar los extremos el cable se tensa.
 - **Viento**: sube *Viento* en *Reposo y naturalidad* y dale a reproducir: los cables que cuelgan se balancean.
-- **Guirnalda o cadena**: elige el estilo *Guirnalda de luces* o *Cadena*.
+- **Guirnalda o cadena**: elige el estilo *Guirnalda de luces* o *Cadena*. Con *Luz cálida* en las piezas metálicas, PipeEditor añade una luz de malla de Arnold (`cable_NN_luz`) para que las bombillas iluminen la escena; su exposición se ajusta en el Attribute Editor de esa luz.
 - **Cientos de cables**: selecciónalos y pulsa **Render como curva**; Arnold los pinta como curvas y la escena pesa mucho menos.
 - **Muchos cables entre dos paneles**: selecciona varias caras de un objeto y varias del otro y pulsa **Entre dos grupos**. Para que sea un mazo, usa *Cables en el haz*.
 - **Tu propio conector**: modela una pieza con el eje Y hacia donde sale el cable, selecciona el cable y la pieza y pulsa **Usar el objeto seleccionado como conector**.

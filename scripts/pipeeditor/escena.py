@@ -208,6 +208,7 @@ def _crear_estructura(base, ajustes):
             cmds.setAttr("{}.{}".format(t, a), lock=True)
         defecto = materiales.POR_TIPO.get(tipo, materiales.POR_TIPO["cable"])[materiales.PARTES.index(parte)]
         materiales.asignar([forma], ajustes.get("material_" + parte) or defecto)
+    luz_de_bombillas(n)
     t = cmds.createNode("transform", name=nombre + "_curva", parent=grupo)
     curva = cmds.createNode("nurbsCurve", name=nombre + "_curvaShape", parent=t)
     cmds.connectAttr(n + ".curva", curva + ".create")
@@ -560,6 +561,70 @@ def poner_material(nodos_, parte, nombre):
     formas = [forma_de(n, parte) for n in nodos_]
     with Bloque():
         materiales.asignar(formas, nombre)
+        if parte == "metal":
+            for n in nodos_:
+                luz_de_bombillas(n)
+
+
+def _hay_arnold():
+    try:
+        return bool(cmds.pluginInfo("mtoa", query=True, loaded=True)) and "aiMeshLight" in (cmds.allNodeTypes() or [])
+    except (RuntimeError, AttributeError):
+        return False
+
+
+def luz_de(n):
+    """Luz de malla de Arnold que hace brillar las piezas metálicas de ``n``, o None."""
+    metal = forma_de(n, "metal")
+    if not metal:
+        return None
+    for d in cmds.listConnections(metal + ".outMesh", destination=True, source=False, shapes=True) or []:
+        if cmds.nodeType(d) == "aiMeshLight":
+            return d
+    return None
+
+
+def luz_de_bombillas(n):
+    """Si las piezas metálicas llevan un material que da luz (las bombillas con «Luz cálida»),
+    una luz de malla de Arnold las hace iluminar de verdad lo que tienen cerca; si no, la quita.
+
+    El material emisivo solo se ve brillar: casi no alumbra la escena. La luz de
+    malla lee la misma malla (sigue al cable), no se ve en cámara y no se
+    normaliza por área, así que cada bombilla da la misma luz aunque haya muchas.
+    Devuelve la forma de la luz o None.
+    """
+    metal = forma_de(n, "metal")
+    existente = luz_de(n)
+    nombre = materiales.de(metal) if metal else None
+    emision = materiales.EMISION.get(nombre)
+    if not emision or not _hay_arnold():
+        if existente and not emision:
+            cmds.delete(cmds.listRelatives(existente, parent=True) or existente)
+        return None
+    if existente:
+        return existente
+    color, intensidad = emision
+    t_metal = cmds.listRelatives(metal, parent=True)[0]
+    padre = cmds.listRelatives(t_metal, parent=True)
+    base = t_metal[:-len("_metal")] if t_metal.endswith("_metal") else t_metal
+    t = cmds.createNode("transform", name=base + "_luz", parent=padre[0] if padre else None)
+    cmds.setAttr(t + ".inheritsTransform", 0)
+    luz = cmds.createNode("aiMeshLight", name=base + "_luzShape", parent=t)
+    cmds.connectAttr(metal + ".outMesh", luz + ".inMesh", force=True)
+    valores = (("color", color), ("intensity", 1.0), ("exposure", 9.0 + (intensidad - 1.0) * 2.0),
+               ("aiNormalize", False), ("lightVisible", False), ("showOriginalMesh", True), ("aiSamples", 2))
+    for atributo, v in valores:
+        if not cmds.attributeQuery(atributo, node=luz, exists=True):
+            continue
+        if isinstance(v, tuple):
+            cmds.setAttr(luz + "." + atributo, *v, type="double3")
+        else:
+            cmds.setAttr(luz + "." + atributo, v)
+    try:
+        cmds.sets(t, add="defaultLightSet")
+    except (RuntimeError, ValueError):
+        pass
+    return luz
 
 
 def fijar_longitudes(nodos_):

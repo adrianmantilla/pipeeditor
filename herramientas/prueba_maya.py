@@ -276,7 +276,7 @@ def main():
         escena.poner_apoyos([nt], [pared, techo])
         cmds.setAttr(nt + ".soportesHacia", 1)
         cmds.setAttr(nt + ".alcanceSoportes", 400.0)
-        ys = [p[1] for p in cmds.xform(m_tub + ".vtx[*]", query=True, translation=True, worldSpace=True)[1::3]]
+        ys = (cmds.xform(m_tub + ".vtx[*]", query=True, translation=True, worldSpace=True) or [])[1::3]
         comprobar(ys and max(ys) > 395, "soportes colgados del techo ({:.0f})".format(max(ys) if ys else 0))
         cmds.setAttr(nt + ".soportesHacia", 0)
         escena.poner_apoyos([nt], [pared])
@@ -382,6 +382,20 @@ def main():
                       and not cmds.getAttr(cmds.listRelatives(escena.formas_de(nv_)[0], parent=True)[0]
                                            + ".visibility"), "render como curva de Arnold")
             comprobar(escena.alternar_curva_arnold([nv_]) is False, "volver a las mallas")
+            g_luces = escena.crear([((0, 300, 1400), (1, 0, 0), None), ((300, 300, 1400), (-1, 0, 0), None)],
+                                   {"tipo": "cable", "pieza": "bombilla", "separacion_piezas": 50.0,
+                                    "material_metal": "luz_calida"})
+            nl = escena.nodo_de(g_luces)
+            luz = escena.luz_de(nl)
+            comprobar(bool(luz) and cmds.nodeType(luz) == "aiMeshLight"
+                      and not cmds.getAttr(luz + ".lightVisible"), "las bombillas alumbran (luz de malla)")
+            escena.poner_material([nl], "metal", "laton")
+            comprobar(escena.luz_de(nl) is None, "sin «Luz cálida», no hay luz")
+            escena.poner_material([nl], "metal", "luz_calida")
+            comprobar(bool(escena.luz_de(nl)), "la luz vuelve con «Luz cálida»")
+            luz = escena.luz_de(nl)
+            escena.borrar([nl])
+            comprobar(not cmds.objExists(luz), "borrar quita también la luz")
         for extension in (".obj", ".fbx", ".usda"):
             destino_exp = os.path.join(temporal, "exportado" + extension)
             try:
