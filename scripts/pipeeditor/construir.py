@@ -358,12 +358,20 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None, ca
     if not fin.malla.vacia():
         res.piezas.anadir(fin.malla, marco_fin)
         res.contar("conector_" + a["conector_fin"])
+    # rollo: el cable que sobra, enrollado junto al anclaje, con el mismo perfil
+    for tipo, marco in ((a["conector_inicio"], marco_ini), (a["conector_fin"], marco_fin)):
+        if tipo == "rollo":
+            puntos, _largo = piezas.camino_rollo(r_total)
+            res.cuerpo.anadir(perfiles.cuerpo_cable(puntos, r_total, a["perfil_cable"], a["lados"]), marco)
+            res.contar("cable_{:.2f}".format(2.0 * r), vec.longitud_polilinea(puntos))
     margen = max(inicio.largo, fin.largo) + a["salida"] + r_total * 4
     if a["pieza"] != "ninguna" and a["separacion_piezas"] > 0:
         modelo = piezas.pieza_cable(a["pieza"], r if res.hilos else r_total)
         for h in (res.hilos or [camino]):
             for p, t, _s in trazado.uniforme(h, a["separacion_piezas"], margen=margen):
-                res.piezas.anadir(modelo, vec.marco_desde_eje(p, t))
+                marco = (vec.marco_desde_eje(p, (0.0, -1.0, 0.0), t) if a["pieza"] == "bombilla"
+                         else vec.marco_desde_eje(p, t))
+                res.piezas.anadir(modelo, marco)
                 res.contar("pieza_" + a["pieza"])
     if cantidad > 1 and a["separacion_bridas_haz"] > 0:
         modelo = piezas.brida_haz(r_total)

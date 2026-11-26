@@ -38,6 +38,16 @@ def _poner(material, tipo, base, metal, rugosidad, capa):
     cmds.setAttr(material + "." + nombres["capa"], capa)
 
 
+def _emision(material, tipo, color, intensidad):
+    """El material da luz (bombillas): en Arnold ilumina la escena."""
+    if tipo == "openPBRSurface":
+        cmds.setAttr(material + ".emissionColor", *color, type="double3")
+        cmds.setAttr(material + ".emissionLuminance", 1000.0 * intensidad)
+    else:
+        cmds.setAttr(material + ".emissionColor", *color, type="double3")
+        cmds.setAttr(material + ".emission", 4.0 * intensidad)
+
+
 def grupo(nombre):
     """Grupo de sombreado del material ``nombre``; lo crea si no existe."""
     if nombre not in MATERIALES:
@@ -50,6 +60,8 @@ def grupo(nombre):
     if not cmds.objExists(material):
         material = cmds.shadingNode(tipo, asShader=True, name=material)
         _poner(material, tipo, *MATERIALES[nombre])
+        if nombre in datos.EMISION:
+            _emision(material, tipo, *datos.EMISION[nombre])
     if not cmds.objExists(sg):
         sg = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name=sg)
     if not cmds.isConnected(material + ".outColor", sg + ".surfaceShader"):

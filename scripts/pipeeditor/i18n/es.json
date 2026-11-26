@@ -62,7 +62,7 @@
   "seccion_resultado": "Resultado",
   "campo_tipo": "Tipo",
   "campo_perfil_cable": "Perfil",
-  "campo_perfil_cable_ayuda": "Forma del cable: redondo, doble (lámpara), plano (cinta), trenzado (cuerda), corrugado (manguera) o espiral (teléfono).",
+  "campo_perfil_cable_ayuda": "Forma del cable: redondo, doble (lámpara), plano (cinta), trenzado (cuerda), corrugado (manguera), espiral (teléfono) o cadena (el grosor es el del alambre de los eslabones).",
   "campo_perfil_tuberia": "Perfil",
   "campo_perfil_tuberia_ayuda": "Forma de la tubería: redonda, cuadrada (conducto), corrugada (flexible) o aislada.",
   "campo_grosor": "Grosor",
@@ -328,5 +328,11 @@
   "campo_rafagas": "Ráfagas",
   "campo_rafagas_ayuda": "Cuántos vaivenes por segundo.",
   "campo_direccion_viento": "Dirección del viento",
-  "campo_direccion_viento_ayuda": "Hacia dónde sopla, en grados sobre el suelo (0 = hacia +X). Un cable que va en la misma dirección que el viento apenas se mueve."
+  "campo_direccion_viento_ayuda": "Hacia dónde sopla, en grados sobre el suelo (0 = hacia +X). Un cable que va en la misma dirección que el viento apenas se mueve.",
+  "opcion_perfil_cable_cadena": "Cadena",
+  "opcion_pieza_bombilla": "Bombilla (guirnalda)",
+  "material_luz_calida": "Luz cálida (da luz)",
+  "estilo_serie_Guirnalda de luces": "Guirnalda de luces",
+  "estilo_serie_Cadena": "Cadena",
+  "opcion_conector_rollo": "Rollo (lo que sobra, enrollado)"
 }

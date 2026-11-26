@@ -18,6 +18,11 @@ MATERIALES = {
     "aluminio": ((0.85, 0.86, 0.88), 1.0, 0.28, 0.0),
     "plastico_negro": ((0.03, 0.03, 0.03), 0.0, 0.3, 0.0),
     "laton": ((0.91, 0.71, 0.38), 1.0, 0.3, 0.0),
+    "luz_calida": ((0.95, 0.85, 0.7), 0.0, 0.1, 0.0),
+}
+# Materiales que dan luz: nombre: (color de la luz, intensidad)
+EMISION = {
+    "luz_calida": ((1.0, 0.72, 0.42), 1.0),
 }
 # Partes de cada cable o tubería con su propio material.
 PARTES = ("cuerpo", "piezas", "metal")
@@ -27,9 +32,9 @@ POR_TIPO = {
     "tuberia": ("cobre", "acero", "acero_galvanizado"),
 }
 CABLE = ("goma_negra", "pvc_blanco", "pvc_rojo", "pvc_amarillo", "nailon_azul", "canamo", "manguera_naranja",
-         "cobre", "acero")
+         "cobre", "acero", "acero_galvanizado", "oxido")
 TUBERIA = ("cobre", "pvc_gris", "pvc_blanco", "hierro_pintado", "acero_galvanizado", "aluminio", "oxido",
            "acero")
 PIEZAS = ("plastico_negro", "acero", "acero_galvanizado", "cobre", "oxido", "pvc_blanco")
-METAL = ("acero", "acero_galvanizado", "laton", "cobre", "aluminio", "oxido")
+METAL = ("acero", "acero_galvanizado", "laton", "cobre", "aluminio", "oxido", "luz_calida")
 LISTA = {"piezas": PIEZAS, "metal": METAL}

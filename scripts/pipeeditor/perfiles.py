@@ -11,7 +11,7 @@ import math
 from pipeeditor import malla as ml
 from pipeeditor import trazado, vec
 
-PERFILES_CABLE = ("redondo", "doble", "plano", "trenzado", "corrugado", "espiral")
+PERFILES_CABLE = ("redondo", "doble", "plano", "trenzado", "corrugado", "espiral", "cadena")
 PERFILES_TUBERIA = ("redonda", "cuadrada", "corrugada", "aislada")
 
 # Puntos máximos de un recorrido para que un cable no tumbe a Maya.
@@ -86,6 +86,8 @@ def cuerpo_cable(centros, radio, perfil="redondo", lados=8, cantidad=1, torsion=
     if len(centros) < 2:
         return ml.Malla()
     lados = max(3, int(lados))
+    if perfil == "cadena":
+        return cadena(centros, radio, lados)
     detalle = {"trenzado": radio * 0.45, "corrugado": radio * 0.3, "espiral": radio * 0.6}.get(perfil)
     if cantidad > 1 and torsion:
         detalle = min(detalle or 1e9, 100.0 / max(abs(torsion), 1e-6) / 24.0)
@@ -104,6 +106,68 @@ def cuerpo_cable(centros, radio, perfil="redondo", lados=8, cantidad=1, torsion=
         else:
             ruta, marcos_ruta = centros, marcos
         total.anadir(_un_cable(ruta, marcos_ruta, radio, perfil, lados))
+    return total
+
+
+def eslabon(radio_alambre, lados=8, pasos=8):
+    """Eslabón de cadena (eje Y), centrado en el origen, en el plano XY.
+
+    Medidas de una cadena corriente: luz interior de 3,5 diámetros de alambre
+    de largo por 1,4 de ancho.
+    """
+    d = 2.0 * radio_alambre
+    rc = 1.2 * d                      # radio de las curvas (al eje del alambre)
+    recta = 2.1 * d                   # largo de cada lado recto
+    centros, marcos = [], []
+
+    def anadir(c, t):
+        t = vec.unitario(t)
+        fuera = vec.unitario((c[0], 0.0, 0.0)) if abs(c[0]) > 1e-9 else (0.0, 1.0 if c[1] > 0 else -1.0, 0.0)
+        nn = vec.unitario(vec.resta(fuera, vec.escala(t, vec.punto(fuera, t))), (1.0, 0.0, 0.0))
+        centros.append(c)
+        marcos.append((t, nn, vec.cruz(t, nn)))
+
+    for i in range(pasos):               # lado derecho, subiendo
+        y = -recta / 2.0 + recta * i / float(pasos)
+        anadir((rc, y, 0.0), (0.0, 1.0, 0.0))
+    for i in range(pasos * 2):           # curva de arriba
+        a = math.pi * i / float(pasos * 2)
+        anadir((rc * math.cos(a), recta / 2.0 + rc * math.sin(a), 0.0), (-math.sin(a), math.cos(a), 0.0))
+    for i in range(pasos):               # lado izquierdo, bajando
+        y = recta / 2.0 - recta * i / float(pasos)
+        anadir((-rc, y, 0.0), (0.0, -1.0, 0.0))
+    for i in range(pasos * 2):           # curva de abajo
+        a = math.pi + math.pi * i / float(pasos * 2)
+        anadir((rc * math.cos(a), -recta / 2.0 + rc * math.sin(a), 0.0), (-math.sin(a), math.cos(a), 0.0))
+    centros.append(centros[0])
+    marcos.append(marcos[0])
+    return ml.barrer(centros, marcos, lambda i: ml.circulo(radio_alambre, lados), tapas=False,
+                     escala_v=2 * math.pi * radio_alambre)
+
+
+def paso_cadena(radio_alambre):
+    return 3.5 * 2.0 * radio_alambre
+
+
+def cadena(centros, radio_alambre, lados=8):
+    """Cadena de eslabones a lo largo de ``centros``; cada eslabón, girado 90° respecto al anterior.
+
+    ``radio_alambre``: la mitad del grosor del cable (una cadena «de 8 mm»
+    tiene alambre de 8 mm).
+    """
+    modelo = eslabon(radio_alambre, max(6, lados))
+    paso = paso_cadena(radio_alambre)
+    total = ml.Malla()
+    marcos = trazado.marcos(centros)
+    s = vec.acumulada(centros)
+    j = 0
+    for k, (p, t, d) in enumerate(trazado.uniforme(centros, paso)):
+        while j < len(s) - 2 and s[j + 1] < d:
+            j += 1
+        lado = marcos[j][1]
+        if k % 2:
+            lado = vec.cruz(t, lado)
+        total.anadir(modelo, vec.marco_desde_eje(p, t, lado))
     return total
 
 

@@ -22,7 +22,11 @@ class Cables(unittest.TestCase):
             with self.subTest(conector=con):
                 r = c.construir({"conector_inicio": con, "conector_fin": con}, A)
                 comun.comprobar_malla(self, r.piezas)
-                if con in ("ninguno", "propio"):
+                if con == "rollo":  # el rollo es cable: va en el cuerpo
+                    comun.comprobar_malla(self, r.cuerpo)
+                    sin = c.construir({}, A)
+                    self.assertGreater(r.cuerpo.num_caras, sin.cuerpo.num_caras * 2)
+                elif con in ("ninguno", "propio"):
                     self.assertTrue(r.piezas.vacia())
                 else:
                     self.assertFalse(r.piezas.vacia())

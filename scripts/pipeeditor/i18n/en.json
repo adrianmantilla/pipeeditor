@@ -62,7 +62,7 @@
   "seccion_resultado": "Result",
   "campo_tipo": "Type",
   "campo_perfil_cable": "Profile",
-  "campo_perfil_cable_ayuda": "Cable shape: round, twin (lamp cord), flat (ribbon), braided (rope), corrugated (hose) or coiled (phone cord).",
+  "campo_perfil_cable_ayuda": "Cable shape: round, twin (lamp cord), flat (ribbon), braided (rope), corrugated (hose), coiled (phone cord) or chain (thickness is the link wire).",
   "campo_perfil_tuberia": "Profile",
   "campo_perfil_tuberia_ayuda": "Pipe shape: round, square (duct), corrugated (flexible) or insulated.",
   "campo_grosor": "Thickness",
@@ -328,5 +328,11 @@
   "campo_rafagas": "Gusts",
   "campo_rafagas_ayuda": "How many swings per second.",
   "campo_direccion_viento": "Wind direction",
-  "campo_direccion_viento_ayuda": "Where it blows, in degrees on the ground (0 = towards +X). A cable running along the wind barely moves."
+  "campo_direccion_viento_ayuda": "Where it blows, in degrees on the ground (0 = towards +X). A cable running along the wind barely moves.",
+  "opcion_perfil_cable_cadena": "Chain",
+  "opcion_pieza_bombilla": "Light bulb (festoon)",
+  "material_luz_calida": "Warm light (emissive)",
+  "estilo_serie_Guirnalda de luces": "Festoon lights",
+  "estilo_serie_Cadena": "Chain",
+  "opcion_conector_rollo": "Coil (spare cable, coiled)"
 }

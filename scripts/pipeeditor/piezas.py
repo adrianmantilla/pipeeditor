@@ -10,8 +10,8 @@ import math
 from pipeeditor import malla as ml
 from pipeeditor import vec
 
-CONECTORES = ("ninguno", "clavija", "jack", "terminal", "gancho", "grillete", "propio", "aislador")
-PIEZAS_CABLE = ("ninguna", "brida", "anillo", "etiqueta")
+CONECTORES = ("ninguno", "clavija", "jack", "terminal", "gancho", "grillete", "propio", "aislador", "rollo")
+PIEZAS_CABLE = ("ninguna", "brida", "anillo", "etiqueta", "bombilla")
 EXTREMOS_TUBERIA = ("abiertos", "tapon", "brida")
 SENALES = ("ninguna", "flecha", "banda", "flecha_y_banda")
 # Accesorios que se ponen en un anclaje de una tubería.
@@ -82,10 +82,33 @@ def conector(tipo, r, propia=None):
             y += 0.42 * R
         m.anadir(ml.cilindro(R * 0.5, y, y + 0.35 * R, 12, radio_final=R * 0.38))
         return Conector(m, y + 0.35 * R)
+    if tipo == "rollo":
+        camino, largo = camino_rollo(r)
+        return Conector(m, largo)  # la malla la hace construir, con el perfil del cable
     if tipo == "propio" and propia is not None and not propia.vacia():
         _minimo, maximo = propia.caja()
         return Conector(propia, max(0.0, maximo[1]))
     return Conector(m, 0.0)
+
+
+def camino_rollo(r, vueltas=4):
+    """Rollo de cable tumbado alrededor del anclaje (eje Y): espiras apiladas y la
+    punta que sale por el centro, arriba. Devuelve (puntos, largo)."""
+    R = max(14.0 * r, 8.0)
+    paso = 2.1 * r
+    puntos = []
+    pasos = 24
+    for k in range(vueltas * pasos + 1):
+        a = 2 * math.pi * k / pasos
+        puntos.append((R * math.cos(a), r + paso * k / pasos, R * math.sin(a)))
+    arriba = puntos[-1][1] + r * 2.0
+    # la punta entra hacia el centro y sale hacia arriba
+    for k in range(1, 7):
+        u = k / 6.0
+        puntos.append((R * (1.0 - u), arriba * (0.85 + 0.15 * u), 0.0))
+    largo = arriba + r * 3.0
+    puntos.append((0.0, largo, 0.0))
+    return puntos, largo
 
 
 def pieza_cable(tipo, r):
@@ -99,6 +122,27 @@ def pieza_cable(tipo, r):
     elif tipo == "etiqueta":
         m.anadir(ml.cilindro(r * 1.12, -r * 1.2, r * 1.2, 12))
         m.anadir(ml.caja(r * 0.15, r * 2.4, r * 3.2, centro=(r * 1.2, 0.0, r * 2.4)))
+    elif tipo == "bombilla":
+        m.anadir(bombilla(r))
+    return m
+
+
+def bombilla(r):
+    """Portalámparas y bombilla de guirnalda colgando hacia +Y (se coloca con Y hacia abajo).
+
+    A tamaño real (en cm): la bombilla mide unos 4,5 cm. El cristal va en la
+    malla de metal, para darle su propio material (por ejemplo, «Luz cálida»).
+    """
+    m = ml.Malla()
+    m.anadir(ml.toro(r * 1.1, max(r * 0.3, 0.12), 12, 5))                    # abrazadera al cable
+    m.anadir(ml.cilindro(0.35, r, r + 1.0, 8))                                 # rabillo
+    m.anadir(ml.cilindro(1.25, r + 1.0, r + 3.8, 16, radio_final=1.1))         # portalámparas
+    cristal = ml.Malla()
+    perfil = [(0.0, 0.0), (0.9, 0.0), (1.35, 0.6), (2.15, 1.9), (2.3, 2.9), (2.0, 3.9), (1.2, 4.6), (0.0, 4.8)]
+    centros = [(0.0, r + 3.6 + y, 0.0) for _x, y in perfil]
+    marcos = [((0, 1, 0), (1, 0, 0), (0, 0, -1))] * len(perfil)
+    cristal.anadir(ml.barrer(centros, marcos, lambda i: ml.circulo(max(perfil[i][0], 0.05), 16), tapas=True))
+    m.anadir(ml.metal(cristal))
     return m
 
 
