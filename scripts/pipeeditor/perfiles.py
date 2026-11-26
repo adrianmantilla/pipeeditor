@@ -12,7 +12,7 @@ from pipeeditor import malla as ml
 from pipeeditor import trazado, vec
 
 PERFILES_CABLE = ("redondo", "doble", "plano", "trenzado", "corrugado", "espiral", "cadena")
-PERFILES_TUBERIA = ("redonda", "cuadrada", "corrugada", "aislada")
+PERFILES_TUBERIA = ("redonda", "cuadrada", "corrugada", "aislada", "bandeja")
 
 # Puntos máximos de un recorrido para que un cable no tumbe a Maya.
 MAX_PUNTOS = 6000
@@ -254,6 +254,18 @@ def cuerda(centros, marcos, radio, lados):
 
 # --- tuberías -------------------------------------------------------------------------
 
+def perfil_bandeja(radio):
+    """Sección en U de una bandeja portacables: ancho = grosor, alto = la mitad (máximo 10 cm), abierta hacia arriba."""
+    ancho = 2.0 * radio
+    alto = min(ancho * 0.5, 10.0)
+    e = max(0.08, ancho * 0.012)
+    a, b = -alto / 2.0, alto / 2.0
+    w = ancho / 2.0
+    puntos = [(a, -w), (a, w), (b, w), (b, w - e), (a + e, w - e), (a + e, -w + e), (b, -w + e), (b, -w)]
+    area = sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(puntos, puntos[1:] + puntos[:1]))
+    return puntos if area > 0 else list(reversed(puntos))
+
+
 def cuerpo_tuberia(centros, radio, perfil="redonda", lados=16, pared=0.0, abierta=False):
     """Malla de la tubería. Si ``abierta`` y hay ``pared``, se ve hueca en los extremos."""
     if len(centros) < 2:
@@ -263,6 +275,9 @@ def cuerpo_tuberia(centros, radio, perfil="redonda", lados=16, pared=0.0, abiert
         forma = ml.cuadrado_redondeado(2.0 * radio, 0.18 * radio, max(1, lados // 8))
         interior = ml.cuadrado_redondeado(2.0 * (radio - pared), 0.12 * radio, max(1, lados // 8)) if pared else None
         radio_en = None
+    elif perfil == "bandeja":
+        forma, interior, radio_en = perfil_bandeja(radio), None, None
+        pared = 0.0
     elif perfil == "corrugada":
         centros = trazado.remuestrear(centros, _paso_seguro(centros, radio * 0.16))
         periodo = radio * 0.7

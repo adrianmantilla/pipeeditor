@@ -750,6 +750,86 @@ def lista_materiales(nodos_, ruta=None):
     return filas_
 
 
+def es_curva_arnold(n):
+    curva = formas_de(n)[2]
+    return bool(curva and cmds.attributeQuery("aiRenderCurve", node=curva, exists=True)
+                and cmds.getAttr(curva + ".aiRenderCurve"))
+
+
+def alternar_curva_arnold(nodos_):
+    """Los cables se renderizan como curvas de Arnold (ligeras) en vez de mallas, o al revés.
+
+    Para escenas con cientos de cables. Las mallas se ocultan; la curva toma
+    el grosor y el material del cuerpo. Devuelve True si quedan como curvas,
+    False si vuelven a ser mallas, o None si no hay Arnold (MtoA) o cables.
+    """
+    cables = [n for n in nodos_ if leer_ajustes(n)["tipo"] == "cable"]
+    curvas = [formas_de(n)[2] for n in cables]
+    if not cables or not all(c and cmds.attributeQuery("aiRenderCurve", node=c, exists=True) for c in curvas):
+        return None
+    activar = not all(es_curva_arnold(n) for n in cables)
+    with Bloque("Curvas de Arnold"):
+        for n, curva in zip(cables, curvas):
+            t_curva = cmds.listRelatives(curva, parent=True, fullPath=True)[0]
+            cmds.setAttr(curva + ".aiRenderCurve", activar)
+            cmds.setAttr(t_curva + ".visibility", activar)
+            if activar:
+                cmds.setAttr(curva + ".aiCurveWidth", cmds.getAttr(n + ".grosor"))
+                if cmds.attributeQuery("aiMode", node=curva, exists=True):
+                    cmds.setAttr(curva + ".aiMode", 1)  # gruesa (redonda), no cinta
+                cuerpo = forma_de(n, "cuerpo")
+                material = materiales.de(cuerpo) if cuerpo else None
+                if material and cmds.attributeQuery("aiCurveShader", node=curva, exists=True):
+                    cmds.connectAttr(materiales.PREFIJO + material + ".outColor", curva + ".aiCurveShader",
+                                     force=True)
+            for parte in materiales.PARTES:
+                forma = forma_de(n, parte)
+                if forma:
+                    cmds.setAttr(cmds.listRelatives(forma, parent=True, fullPath=True)[0] + ".visibility",
+                                 not activar)
+    return activar
+
+
+def exportar_horneado(nodos_, ruta):
+    """Exporta ``nodos_`` horneados (mallas normales) a USD, FBX u OBJ según la extensión de ``ruta``.
+
+    La escena abierta no cambia: se hornea, se exporta y se deshace.
+    """
+    import os
+    extension = os.path.splitext(ruta)[1].lower()
+    if extension in (".usd", ".usda", ".usdc"):
+        cmds.loadPlugin("mayaUsdPlugin", quiet=True)
+    elif extension == ".fbx":
+        cmds.loadPlugin("fbxmaya", quiet=True)
+    elif extension == ".obj":
+        cmds.loadPlugin("objExport", quiet=True)
+    else:
+        raise ValueError(_texto("formato_no_valido"))
+    seleccion = cmds.ls(selection=True, long=True) or []
+    deshacer = cmds.undoInfo(query=True, state=True)
+    if not deshacer:
+        cmds.undoInfo(state=True)
+    try:
+        with Bloque("Exportar horneado"):
+            grupos = hornear(nodos_)
+        try:
+            cmds.select(grupos, replace=True)
+            if extension == ".fbx":
+                cmds.file(ruta, exportSelected=True, type="FBX export", force=True)
+            elif extension == ".obj":
+                cmds.file(ruta, exportSelected=True, type="OBJexport", force=True,
+                          options="groups=1;ptgroups=1;materials=1;smoothing=1;normals=1")
+            else:
+                cmds.mayaUSDExport(file=ruta, selection=True, exportUVs=True, shadingMode="useRegistry")
+        finally:
+            cmds.undo()
+    finally:
+        if not deshacer:
+            cmds.undoInfo(state=False)
+        cmds.select(seleccion, replace=True) if seleccion else cmds.select(clear=True)
+    return len(grupos)
+
+
 def guardar_copia_horneada(ruta):
     """Guarda en ``ruta`` una copia de la escena con todo horneado, sin tocar la escena abierta.
 

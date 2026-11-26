@@ -349,6 +349,50 @@ def main():
                   "una escena de la 1.0 se mantiene como era (recorrido en Z, sin reposo)")
         cmds.delete(viejo)
 
+        # --- fase 4: viento, cadena, rollo, bandeja, curvas de Arnold, exportar ---
+        g_viento = escena.crear([((0, 400, 900), (1, 0, 0), None), ((500, 400, 900), (-1, 0, 0), None)],
+                                {"tipo": "cable", "holgura": 0.1, "reposo": False})
+        nv_ = escena.nodo_de(g_viento)
+        escena.poner_ajustes([nv_], {"viento": 0.8, "direccion_viento": 90.0})
+        comprobar(cmds.listConnections(nv_ + ".tiempo", source=True) == ["time1"], "con viento, lee el tiempo")
+        cmds.currentTime(1)
+        v1 = puntos_curva(escena.formas_de(nv_)[2], 20)[10]
+        cmds.currentTime(20)
+        v2 = puntos_curva(escena.formas_de(nv_)[2], 20)[10]
+        comprobar(math.dist(v1, v2) > 1.0, "el viento mueve el cable con el tiempo ({:.1f})".format(math.dist(v1, v2)))
+        escena.poner_ajustes([nv_], {"viento": 0.0})
+        comprobar(not cmds.listConnections(nv_ + ".tiempo", source=True), "sin viento, no lee el tiempo")
+        cmds.currentTime(1)
+        g_cadena = escena.crear([((0, 300, 1000), (1, 0, 0), None), ((150, 300, 1000), (-1, 0, 0), None)],
+                                {"tipo": "cable", "perfil_cable": "cadena", "grosor": 1.0, "conector_fin": "rollo"})
+        comprobar(caras(escena.formas_de(escena.nodo_de(g_cadena))[0]) > 1000, "cadena con rollo")
+        g_bandeja = escena.crear([((0, 250, 1100), (0, -1, 0), None), ((300, 250, 1300), (0, -1, 0), None)],
+                                 {"tipo": "tuberia", "perfil_tuberia": "bandeja", "grosor": 30.0})
+        comprobar(caras(escena.formas_de(escena.nodo_de(g_bandeja))[0]) > 20, "bandeja portacables")
+        try:
+            cmds.loadPlugin("mtoa", quiet=True)
+        except RuntimeError:
+            pass
+        hecho = escena.alternar_curva_arnold([nv_])
+        if hecho is None:
+            print("  (sin MtoA: no se prueba el render como curva)")
+        else:
+            curva_v = escena.formas_de(nv_)[2]
+            comprobar(hecho and cmds.getAttr(curva_v + ".aiRenderCurve")
+                      and not cmds.getAttr(cmds.listRelatives(escena.formas_de(nv_)[0], parent=True)[0]
+                                           + ".visibility"), "render como curva de Arnold")
+            comprobar(escena.alternar_curva_arnold([nv_]) is False, "volver a las mallas")
+        for extension in (".obj", ".fbx", ".usda"):
+            destino_exp = os.path.join(temporal, "exportado" + extension)
+            try:
+                hechos_exp = escena.exportar_horneado([nv_, escena.nodo_de(g_cadena)], destino_exp)
+            except Exception as error:
+                print("  (no se pudo exportar a {}: {})".format(extension, error))
+                continue
+            comprobar(hechos_exp == 2 and os.path.getsize(destino_exp) > 1000 and cmds.objExists(nv_),
+                      "exportar horneado a {} sin tocar la escena".format(extension))
+        escena.borrar([nv_, escena.nodo_de(g_cadena), escena.nodo_de(g_bandeja)])
+
         # --- guardar y abrir ---
         ruta = os.path.join(temporal, "prueba_pipeeditor.ma")
         cmds.file(rename=ruta)

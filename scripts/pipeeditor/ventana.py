@@ -155,6 +155,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
                         ("quitar_punto", self.servicio.quitar_puntos, ("cable", "tuberia")),
                         ("gancho", self.servicio.alternar_gancho, ("cable",)),
                         ("fijar_forma", self.servicio.alternar_fijado, ("cable",)),
+                        ("curva_arnold", self._servicio("alternar_curva_arnold"), ("cable",)),
                         ("derivar", self._servicio("derivar"), ("tuberia",)),
                         ("seleccionar_anclas", self.servicio.seleccionar_anclas, ("cable", "tuberia")),
                         ("seleccionar_cuerpo", self.servicio.seleccionar_cuerpos, ("cable", "tuberia")),

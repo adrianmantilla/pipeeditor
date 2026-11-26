@@ -74,7 +74,7 @@ class Textos(unittest.TestCase):
             usadas.add("material_" + n)
         for k in ("crear_clic", "crear_seleccion", "crear_grupos", "crear_aristas", "crear_curva",
                   "insertar_punto", "quitar_punto", "seleccionar_anclas", "seleccionar_cuerpo", "hornear",
-                  "borrar", "gancho", "fijar_forma", "derivar", "accesorio"):
+                  "borrar", "gancho", "fijar_forma", "derivar", "accesorio", "curva_arnold"):
             usadas |= {k, k + "_ayuda"}
         usadas |= {"editando_uno", "editando_varios", "material_cuerpo", "material_piezas", "material_metal",
                    "atrib_holgura_tramo", "atrib_longitud_tramo", "atrib_gancho"}

@@ -23,6 +23,7 @@ COMANDOS = {
     "PipeEditorHornear": ("cmd_hornear", "hornear()"),
     "PipeEditorCopiaHorneada": ("cmd_copia_horneada", "copia_horneada()"),
     "PipeEditorListaMateriales": ("cmd_lista_materiales", "lista_materiales()"),
+    "PipeEditorExportar": ("cmd_exportar", "exportar()"),
 }
 
 _estado = {"ventana": None, "servicio": None, "trabajos": [], "avisos": []}
@@ -170,6 +171,13 @@ class ServicioMaya(object):
         grupo = escena.derivar(ancla, destinos[-1], mirar_a_la_te=objeto)
         cmds.select(grupo)
         return t("derivada", nombre=grupo.split("|")[-1])
+
+    def alternar_curva_arnold(self):
+        nodos = self.seleccion()
+        hecho = escena.alternar_curva_arnold(nodos) if nodos else None
+        if hecho is None:
+            raise ValueError(t("falta_arnold"))
+        return t("curva_si" if hecho else "curva_no")
 
     def alternar_fijado(self):
         nodos = self.seleccion()
@@ -352,6 +360,28 @@ def lista_materiales(ruta=None):
     return ruta
 
 
+def exportar(ruta=None):
+    """Exporta lo seleccionado (o toda la escena) horneado a USD, FBX u OBJ."""
+    nodos = escena.nodos_seleccionados() or escena.nodos()
+    if not nodos:
+        cmds.warning(t("falta_cable"))
+        return None
+    if ruta is None:
+        elegida = cmds.fileDialog2(fileMode=0, caption=t("menu_exportar"),
+                                   fileFilter="USD (*.usd *.usda *.usdc);;FBX (*.fbx);;OBJ (*.obj)")
+        if not elegida:
+            return None
+        ruta = elegida[0]
+    try:
+        n = escena.exportar_horneado(nodos, ruta)
+    except (RuntimeError, ValueError) as error:
+        cmds.warning("PipeEditor: {}".format(error))
+        return None
+    om.MGlobal.displayInfo(t("exportado", n=n, ruta=ruta))
+    servicio().mensaje(t("exportado", n=n, ruta=os.path.basename(ruta)))
+    return ruta
+
+
 def _crear_ordenes():
     for nombre, (clave, llamada) in COMANDOS.items():
         codigo = "import pipeeditor.interfaz_maya as m\nm.{}".format(llamada)
@@ -377,6 +407,7 @@ def _crear_menu():
     cmds.menuItem(label=t("menu_hornear_todo"), command=lambda *_: _hornear_todo())
     cmds.menuItem(label=t("menu_copia_horneada"), command=lambda *_: copia_horneada())
     cmds.menuItem(label=t("menu_lista_materiales"), command=lambda *_: lista_materiales())
+    cmds.menuItem(label=t("menu_exportar"), command=lambda *_: exportar())
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_idioma"), subMenu=True)
     cmds.radioMenuItemCollection()

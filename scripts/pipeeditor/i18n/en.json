@@ -64,7 +64,7 @@
   "campo_perfil_cable": "Profile",
   "campo_perfil_cable_ayuda": "Cable shape: round, twin (lamp cord), flat (ribbon), braided (rope), corrugated (hose), coiled (phone cord) or chain (thickness is the link wire).",
   "campo_perfil_tuberia": "Profile",
-  "campo_perfil_tuberia_ayuda": "Pipe shape: round, square (duct), corrugated (flexible) or insulated.",
+  "campo_perfil_tuberia_ayuda": "Pipe shape: round, square (duct), corrugated (flexible), insulated or cable tray (thickness is the tray width).",
   "campo_grosor": "Thickness",
   "campo_grosor_ayuda": "Diameter of the cable or pipe.",
   "campo_lados": "Sides",
@@ -334,5 +334,15 @@
   "material_luz_calida": "Warm light (emissive)",
   "estilo_serie_Guirnalda de luces": "Festoon lights",
   "estilo_serie_Cadena": "Chain",
-  "opcion_conector_rollo": "Coil (spare cable, coiled)"
+  "opcion_conector_rollo": "Coil (spare cable, coiled)",
+  "opcion_perfil_tuberia_bandeja": "Cable tray",
+  "curva_arnold": "Render as curve",
+  "curva_arnold_ayuda": "Arnold renders the selected cables as curves, without meshes: much lighter with hundreds of cables. They take the body's thickness and material; connectors and parts don't render. Press again to go back to meshes.",
+  "curva_si": "Rendering as Arnold curves.",
+  "curva_no": "Back to meshes.",
+  "falta_arnold": "Select cables with Arnold (MtoA) loaded.",
+  "menu_exportar": "Export baked (USD, FBX or OBJ)…",
+  "cmd_exportar": "PipeEditor: export the selection (or the whole scene) baked to USD, FBX or OBJ",
+  "exportado": "Exported {n} cables or pipes: {ruta}",
+  "formato_no_valido": "Invalid format: use .usd, .usda, .usdc, .fbx or .obj."
 }
