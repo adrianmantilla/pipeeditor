@@ -161,6 +161,18 @@ class Ventana(unittest.TestCase):
         self.v._crear_seleccion()
         self.assertTrue(self.v.botones_editar["hornear"].isEnabled())
 
+    def test_botones_de_editar_segun_el_tipo(self):
+        self.v.show()
+        self.assertTrue(self.v.botones_editar["gancho"].isVisible())
+        self.assertFalse(self.v.botones_editar["derivar"].isVisible())
+        self.assertFalse(self.v.fila_accesorio.isVisible())
+        self.v.cambiar_tipo("tuberia")
+        self.assertFalse(self.v.botones_editar["gancho"].isVisible())
+        self.assertTrue(self.v.botones_editar["derivar"].isVisible())
+        self.assertTrue(self.v.fila_accesorio.isVisible())
+        self.assertEqual(self.v.lista_accesorio.count(), 5)
+        self.v.hide()
+
     def test_todos_los_campos_tienen_valor(self):
         a = self.v.ajustes_actuales()
         for clave in construir.POR_DEFECTO:

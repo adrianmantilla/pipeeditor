@@ -6,6 +6,7 @@ las piezas y la curva central. Al mover un anclaje, Maya lo recalcula solo.
 Toda la geometría la hace ``construir`` (Python puro).
 """
 
+import json
 import math
 
 import maya.api.OpenMaya as om
@@ -121,6 +122,9 @@ class PipeEditorNodo(om.MPxNode):
         A["deslizan"] = num.create("deslizan", "des", om.MFnNumericData.kBoolean, False)
         num.array = True
         num.usesArrayDataBuilder = True
+        A["accesorios"] = num.create("accesorios", "acc", om.MFnNumericData.kInt, 0)
+        num.array = True
+        num.usesArrayDataBuilder = True
         A["ruta"] = typ.create("ruta", "rut", om.MFnData.kNurbsCurve)
         A["apoyos"] = typ.create("apoyos", "apo", om.MFnData.kMesh)
         typ.array = True
@@ -181,6 +185,10 @@ class PipeEditorNodo(om.MPxNode):
         typ.writable = False
         typ.storable = False
         typ.hidden = True
+        A["recuento"] = typ.create("recuento", "rcu", om.MFnData.kString)
+        typ.writable = False
+        typ.storable = False
+        typ.hidden = True
         for nombre, corto, tipo in (("longitudTotal", "lto", om.MFnNumericData.kDouble),
                                     ("caida", "cai", om.MFnNumericData.kDouble),
                                     ("triangulos", "tri", om.MFnNumericData.kInt),
@@ -189,8 +197,8 @@ class PipeEditorNodo(om.MPxNode):
             num.writable = False
             num.storable = False
 
-        salidas = ["cuerpo", "piezas", "metal", "curva", "longitudesActuales", "forma", "longitudTotal", "caida",
-                   "triangulos", "tensos"]
+        salidas = ["cuerpo", "piezas", "metal", "curva", "longitudesActuales", "forma", "recuento", "longitudTotal",
+                   "caida", "triangulos", "tensos"]
         entradas = [n for n in A if n not in salidas]
         for n in entradas + salidas:
             om.MPxNode.addAttribute(A[n])
@@ -201,8 +209,8 @@ class PipeEditorNodo(om.MPxNode):
     # --- cálculo ----------------------------------------------------------------------
     def compute(self, plug, datos):
         A = PipeEditorNodo.atributos
-        salidas = ("cuerpo", "piezas", "metal", "curva", "longitudesActuales", "forma", "longitudTotal", "caida",
-                   "triangulos", "tensos")
+        salidas = ("cuerpo", "piezas", "metal", "curva", "longitudesActuales", "forma", "recuento", "longitudTotal",
+                   "caida", "triangulos", "tensos")
         if plug.isNull or om.MFnAttribute(plug.attribute()).name not in salidas:
             return None
         try:
@@ -223,6 +231,7 @@ class PipeEditorNodo(om.MPxNode):
             om.MFnDoubleArrayData().create(om.MDoubleArray(res.longitudes)))
         datos.outputValue(A["forma"]).setMObject(
             om.MFnDoubleArrayData().create(om.MDoubleArray(construir.forma_a_lista(res, self._anclajes))))
+        datos.outputValue(A["recuento"]).setString(json.dumps(res.recuento, sort_keys=True))
         datos.outputValue(A["longitudTotal"]).setDouble(res.longitud)
         datos.outputValue(A["caida"]).setDouble(res.caida)
         datos.outputValue(A["triangulos"]).setInt(res.triangulos())
@@ -244,6 +253,7 @@ class PipeEditorNodo(om.MPxNode):
         factores = _valores_array(datos.inputArrayValue(A["factores"]), lambda h: h.asDouble())
         longitudes = _valores_array(datos.inputArrayValue(A["longitudes"]), lambda h: h.asDouble())
         deslizan = _valores_array(datos.inputArrayValue(A["deslizan"]), lambda h: h.asBool())
+        accesorios = _valores_array(datos.inputArrayValue(A["accesorios"]), lambda h: h.asInt())
         matrices = _valores_array(datos.inputArrayValue(A["anclas"]), lambda h: h.asMatrix())
         anclajes = []
         for indice in sorted(matrices):
@@ -251,7 +261,8 @@ class PipeEditorNodo(om.MPxNode):
             pos = (m.getElement(3, 0), m.getElement(3, 1), m.getElement(3, 2))
             normal = (m.getElement(1, 0), m.getElement(1, 1), m.getElement(1, 2))
             anclajes.append(construir.Anclaje(pos, normal, factores.get(indice, 1.0), longitudes.get(indice, 0.0),
-                                              deslizan.get(indice, False)))
+                                              deslizan.get(indice, False),
+                                              _accesorio(accesorios.get(indice, 0))))
 
         self._anclajes = anclajes
         ajustes = construir.migrar(ajustes, datos.inputValue(A["versionDatos"]).asInt())
@@ -412,6 +423,10 @@ def _cercano(apoyos):
                 mejor, distancia = ((q.x, q.y, q.z), (n.x, n.y, n.z)), d
         return mejor
     return cercano
+
+
+def _accesorio(i):
+    return piezas.ACCESORIOS[i] if 0 <= i < len(piezas.ACCESORIOS) else piezas.ACCESORIOS[0]
 
 
 def _rayo(apoyos, p, direccion):

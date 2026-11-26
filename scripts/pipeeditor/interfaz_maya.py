@@ -22,6 +22,7 @@ COMANDOS = {
     "PipeEditorTuberiaSeleccion": ("cmd_tuberia_seleccion", "entre_seleccionados('tuberia')"),
     "PipeEditorHornear": ("cmd_hornear", "hornear()"),
     "PipeEditorCopiaHorneada": ("cmd_copia_horneada", "copia_horneada()"),
+    "PipeEditorListaMateriales": ("cmd_lista_materiales", "lista_materiales()"),
 }
 
 _estado = {"ventana": None, "servicio": None, "trabajos": [], "avisos": []}
@@ -142,6 +143,33 @@ class ServicioMaya(object):
         if not anclas:
             raise ValueError(t("falta_ancla"))
         return t("gancho_si" if escena.alternar_gancho(anclas) else "gancho_no")
+
+    def poner_accesorio(self, tipo):
+        anclas = self._anclas_seleccionadas()
+        if not anclas:
+            raise ValueError(t("falta_ancla_tuberia"))
+        n = escena.poner_accesorio(anclas, tipo)
+        if not n:
+            raise ValueError(t("falta_ancla_tuberia"))
+        return t("accesorio_puesto", n=n, accesorio=t("opcion_accesorio_" + tipo))
+
+    def derivar(self):
+        anclas = self._anclas_seleccionadas()
+        if not anclas:
+            raise ValueError(t("falta_derivar"))
+        ancla = anclas[0]
+        resto = [s for s in cmds.ls(orderedSelection=True, long=True) or []
+                 if cmds.ls(s, long=True) != cmds.ls(ancla, long=True)]
+        if not resto:
+            raise ValueError(t("falta_derivar"))
+        cmds.select(resto)
+        destinos = escena.anclajes_de_seleccion(pegar=True)
+        if not destinos:
+            raise ValueError(t("falta_derivar"))
+        objeto = "." not in resto[-1] and not escena.es_ancla(resto[-1])
+        grupo = escena.derivar(ancla, destinos[-1], mirar_a_la_te=objeto)
+        cmds.select(grupo)
+        return t("derivada", nombre=grupo.split("|")[-1])
 
     def alternar_fijado(self):
         nodos = self.seleccion()
@@ -306,6 +334,26 @@ def copia_horneada(ruta=None):
     return ruta
 
 
+def lista_materiales(ruta=None):
+    """Guarda en CSV la lista de materiales de lo seleccionado, o de toda la escena."""
+    nodos = escena.nodos_seleccionados() or escena.nodos()
+    if not nodos:
+        cmds.warning(t("falta_cable"))
+        return None
+    if ruta is None:
+        actual = cmds.file(query=True, sceneName=True)
+        propuesta = (os.path.splitext(actual)[0] + "_materiales.csv") if actual else ""
+        elegida = cmds.fileDialog2(fileMode=0, caption=t("menu_lista_materiales"), startingDirectory=propuesta,
+                                   fileFilter="CSV (*.csv)")
+        if not elegida:
+            return None
+        ruta = elegida[0]
+    filas = escena.lista_materiales(nodos, ruta)
+    om.MGlobal.displayInfo(t("lista_materiales_hecha", n=len(filas), ruta=ruta))
+    servicio().mensaje(t("lista_materiales_hecha", n=len(filas), ruta=os.path.basename(ruta)))
+    return ruta
+
+
 def _crear_ordenes():
     for nombre, (clave, llamada) in COMANDOS.items():
         codigo = "import pipeeditor.interfaz_maya as m\nm.{}".format(llamada)
@@ -330,6 +378,7 @@ def _crear_menu():
     cmds.menuItem(label=t("menu_hornear"), command=lambda *_: hornear())
     cmds.menuItem(label=t("menu_hornear_todo"), command=lambda *_: _hornear_todo())
     cmds.menuItem(label=t("menu_copia_horneada"), command=lambda *_: copia_horneada())
+    cmds.menuItem(label=t("menu_lista_materiales"), command=lambda *_: lista_materiales())
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_idioma"), subMenu=True)
     cmds.radioMenuItemCollection()

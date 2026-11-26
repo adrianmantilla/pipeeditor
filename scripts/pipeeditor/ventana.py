@@ -6,7 +6,7 @@ de la ventana se les aplican al momento; si no, son los ajustes para los
 siguientes que se creen.
 """
 
-from pipeeditor import construir, ventana_campos
+from pipeeditor import construir, piezas, ventana_campos
 from pipeeditor import materiales_datos as materiales
 from pipeeditor.i18n import t
 from pipeeditor.qt import QtCore, QtWidgets
@@ -145,22 +145,41 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         raiz.addWidget(desplazable, 1)
 
         editar = QtWidgets.QGroupBox(t("seccion_editar"))
-        filas = QtWidgets.QGridLayout(editar)
-        filas.setSpacing(4)
+        caja_editar = QtWidgets.QVBoxLayout(editar)
+        self.rejilla_editar = QtWidgets.QGridLayout()
+        self.rejilla_editar.setSpacing(4)
+        caja_editar.addLayout(self.rejilla_editar)
         self.botones_editar = {}
-        for i, (clave, funcion) in enumerate((("insertar_punto", self.servicio.insertar_punto),
-                                              ("quitar_punto", self.servicio.quitar_puntos),
-                                              ("gancho", self.servicio.alternar_gancho),
-                                              ("fijar_forma", self.servicio.alternar_fijado),
-                                              ("seleccionar_anclas", self.servicio.seleccionar_anclas),
-                                              ("seleccionar_cuerpo", self.servicio.seleccionar_cuerpos),
-                                              ("hornear", self._hornear),
-                                              ("borrar", self.servicio.borrar))):
+        # (clave, función, tipos en los que se ve)
+        self._editar = (("insertar_punto", self.servicio.insertar_punto, ("cable", "tuberia")),
+                        ("quitar_punto", self.servicio.quitar_puntos, ("cable", "tuberia")),
+                        ("gancho", self.servicio.alternar_gancho, ("cable",)),
+                        ("fijar_forma", self.servicio.alternar_fijado, ("cable",)),
+                        ("derivar", self._servicio("derivar"), ("tuberia",)),
+                        ("seleccionar_anclas", self.servicio.seleccionar_anclas, ("cable", "tuberia")),
+                        ("seleccionar_cuerpo", self.servicio.seleccionar_cuerpos, ("cable", "tuberia")),
+                        ("hornear", self._hornear, ("cable", "tuberia")),
+                        ("borrar", self.servicio.borrar, ("cable", "tuberia")))
+        for clave, funcion, _tipos in self._editar:
             b = QtWidgets.QPushButton(t(clave))
             b.setToolTip(t(clave + "_ayuda"))
             b.clicked.connect(lambda _=False, f=funcion: self._accion(f))
-            filas.addWidget(b, i // 3, i % 3)
             self.botones_editar[clave] = b
+        self.fila_accesorio = QtWidgets.QWidget()
+        fila = QtWidgets.QHBoxLayout(self.fila_accesorio)
+        fila.setContentsMargins(0, 0, 0, 0)
+        etiqueta = QtWidgets.QLabel(t("accesorio"))
+        etiqueta.setToolTip(t("accesorio_ayuda"))
+        self.lista_accesorio = QtWidgets.QComboBox()
+        self.lista_accesorio.setToolTip(t("accesorio_ayuda"))
+        for o in piezas.ACCESORIOS:
+            self.lista_accesorio.addItem(t("opcion_accesorio_" + o), o)
+        self.lista_accesorio.activated.connect(lambda _i: self._accion(
+            self._servicio("poner_accesorio"), self.lista_accesorio.currentData()))
+        fila.addWidget(etiqueta)
+        fila.addWidget(self.lista_accesorio, 1)
+        caja_editar.addWidget(self.fila_accesorio)
+        self._colocar_botones_editar()
         raiz.addWidget(editar)
 
         self.estado = QtWidgets.QLabel()
@@ -271,6 +290,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
             self.boton_paredes.setVisible(self.tipo == "tuberia")
             self.boton_conector.setVisible(self.tipo == "cable")
             self.botones_crear["crear_grupos"].setVisible(self.tipo == "cable")
+            self._colocar_botones_editar()
             self._llenar_materiales(ajustes)
             self._llenar_estilos()
             self._ajustar_dependientes()
@@ -351,6 +371,7 @@ class VentanaPipeEditor(QtWidgets.QWidget):
             self.estado.setText(t("estado_sin_seleccion"))
         for b in self.botones_editar.values():
             b.setEnabled(bool(self.editando))
+        self.fila_accesorio.setEnabled(bool(self.editando))
 
     # --- cambios ----------------------------------------------------------------------
     def _cambio(self, clave):
@@ -414,6 +435,25 @@ class VentanaPipeEditor(QtWidgets.QWidget):
             self._mensaje(t("estilo_de_serie"))
 
     # --- acciones ---------------------------------------------------------------------
+    def _servicio(self, nombre):
+        """Función del servicio, o una que avisa si este servicio no la tiene."""
+        def llamar(*argumentos):
+            funcion = getattr(self.servicio, nombre, None)
+            if not callable(funcion):
+                raise ValueError(nombre)
+            return funcion(*argumentos)
+        return llamar
+
+    def _colocar_botones_editar(self):
+        for b in self.botones_editar.values():
+            self.rejilla_editar.removeWidget(b)
+            b.setVisible(False)
+        visibles = [self.botones_editar[c] for c, _f, tipos in self._editar if self.tipo in tipos]
+        for i, b in enumerate(visibles):
+            self.rejilla_editar.addWidget(b, i // 3, i % 3)
+            b.setVisible(True)
+        self.fila_accesorio.setVisible(self.tipo == "tuberia")
+
     def _accion(self, funcion, *argumentos):
         try:
             resultado = funcion(*argumentos)

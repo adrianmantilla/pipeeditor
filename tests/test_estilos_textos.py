@@ -74,13 +74,16 @@ class Textos(unittest.TestCase):
             usadas.add("material_" + n)
         for k in ("crear_clic", "crear_seleccion", "crear_grupos", "crear_aristas", "crear_curva",
                   "insertar_punto", "quitar_punto", "seleccionar_anclas", "seleccionar_cuerpo", "hornear",
-                  "borrar", "gancho", "fijar_forma"):
+                  "borrar", "gancho", "fijar_forma", "derivar", "accesorio"):
             usadas |= {k, k + "_ayuda"}
         usadas |= {"editando_uno", "editando_varios", "material_cuerpo", "material_piezas", "material_metal",
                    "atrib_holgura_tramo", "atrib_longitud_tramo", "atrib_gancho"}
         from pipeeditor import estilos, i18n
         usadas |= {"estilo_serie_" + n for n in estilos.DE_SERIE}
         usadas |= {"idioma_" + i for i in i18n.idiomas()}
+        from pipeeditor import piezas as pz
+        usadas |= {"opcion_accesorio_" + a for a in pz.ACCESORIOS}
+        usadas |= {"atrib_accesorio"}
         faltan = sorted(usadas - claves())
         self.assertEqual(faltan, [])
 

@@ -14,6 +14,10 @@ CONECTORES = ("ninguno", "clavija", "jack", "terminal", "gancho", "grillete", "p
 PIEZAS_CABLE = ("ninguna", "brida", "anillo", "etiqueta")
 EXTREMOS_TUBERIA = ("abiertos", "tapon", "brida")
 SENALES = ("ninguna", "flecha", "banda", "flecha_y_banda")
+# Accesorios que se ponen en un anclaje de una tubería.
+ACCESORIOS = ("ninguno", "valvula_bola", "valvula_compuerta", "te", "reduccion")
+
+_EJE_X = vec.matriz((0.0, 0.0, 0.0), (0.0, -1.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0))  # Y local -> X
 
 
 class Conector(object):
@@ -170,6 +174,62 @@ def banda(R):
     """Banda de color alrededor de la tubería, para identificar el fluido."""
     ancho = min(max(2.0 * R, 5.0), 25.0)
     return ml.cilindro(R * 1.012, -ancho / 2.0, ancho / 2.0, 24)
+
+
+def valvula_bola(R):
+    """Válvula de bola: cuerpo, tuercas y maneta. Eje de la tubería en Y; la maneta, hacia +X."""
+    m = ml.Malla()
+    m.anadir(ml.metal(ml.cilindro(R * 1.5, -R * 1.3, R * 1.3, 20)))
+    for signo in (-1.0, 1.0):
+        y0, y1 = sorted((signo * R * 1.25, signo * R * 2.1))
+        m.anadir(ml.metal(ml.cilindro(R * 1.32, y0, y1, 6)))
+    m.anadir(ml.metal(ml.cilindro(R * 0.28, R * 1.2, R * 2.15, 10)), _EJE_X)
+    m.anadir(ml.caja(R * 0.32, R * 3.8, R * 0.7, centro=(R * 2.3, R * 1.3, 0.0)))
+    return m
+
+
+def valvula_compuerta(R):
+    """Válvula de compuerta: cuerpo, tapa, husillo y volante hacia +X."""
+    m = ml.Malla()
+    m.anadir(ml.metal(ml.cilindro(R * 1.45, -R * 1.2, R * 1.2, 20)))
+    for signo in (-1.0, 1.0):
+        y0, y1 = sorted((signo * R * 1.1, signo * R * 1.6))
+        m.anadir(ml.metal(ml.cilindro(R * 1.75, y0, y1, 20)))  # bridas de la válvula
+    m.anadir(ml.metal(ml.cilindro(R * 0.85, 0.0, R * 3.0, 16)), _EJE_X)
+    m.anadir(ml.metal(ml.cilindro(R * 0.16, R * 3.0, R * 4.2, 8)), _EJE_X)
+    volante = ml.toro(R * 1.6, R * 0.16, 24, 6)
+    for k in range(3):
+        a = 2 * math.pi * k / 3.0
+        radio = ml.cilindro(R * 0.1, 0.0, R * 1.6, 6)
+        volante.anadir(radio, vec.matriz((0.0, 0.0, 0.0), (0.0, -1.0, 0.0),
+                                         (math.cos(a), 0.0, math.sin(a)), (-math.sin(a), 0.0, math.cos(a))))
+    m.anadir(volante, vec.matriz((R * 4.0, 0.0, 0.0), (0.0, -1.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)))
+    return m
+
+
+def te(R, largo_rama=None):
+    """Te: manguito a lo largo de la tubería (Y) y salida hacia +X."""
+    largo_rama = largo_rama if largo_rama is not None else R * 1.7
+    m = ml.Malla()
+    m.anadir(ml.cilindro(R * 1.16, -R * 1.35, R * 1.35, 20))
+    m.anadir(ml.cilindro(R * 1.16, R * 0.6, largo_rama, 20), _EJE_X)
+    return m
+
+
+def reduccion(R, r, largo=None):
+    """Reducción concéntrica de ``R`` (en -Y) a ``r`` (en +Y), centrada en el origen."""
+    largo = largo if largo is not None else max(R * 1.6, (R - r) * 3.0)
+    return ml.cilindro(R * 1.12, -largo / 2.0, largo / 2.0, 20, radio_final=r * 1.12)
+
+
+def accesorio(tipo, R):
+    if tipo == "valvula_bola":
+        return valvula_bola(R)
+    if tipo == "valvula_compuerta":
+        return valvula_compuerta(R)
+    if tipo == "te":
+        return te(R)
+    return ml.Malla()
 
 
 def soporte(R, origen, tangente, contacto, normal_superficie):

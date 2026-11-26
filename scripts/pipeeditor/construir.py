@@ -101,12 +101,14 @@ POR_DEFECTO = {
 class Anclaje(object):
     """Punto de anclaje: posición, normal (por dónde sale el cable) y factor de holgura."""
 
-    def __init__(self, posicion, normal=(0.0, 1.0, 0.0), factor=1.0, longitud=0.0, desliza=False):
+    def __init__(self, posicion, normal=(0.0, 1.0, 0.0), factor=1.0, longitud=0.0, desliza=False,
+                 accesorio="ninguno"):
         self.posicion = tuple(posicion)
         self.normal = vec.unitario(normal)
         self.factor = factor
         self.longitud = longitud  # longitud fija del tramo que empieza aquí (0 = sin fijar)
         self.desliza = desliza    # punto intermedio por el que el cable pasa sin atarse (gancho)
+        self.accesorio = accesorio  # tuberías: válvula, te o reducción en este punto (piezas.ACCESORIOS)
 
 
 class Resultado(object):
@@ -120,6 +122,10 @@ class Resultado(object):
         self.longitudes = []
         self.reposado = False
         self.hilos = []  # recorrido de cada cable de un haz suelto
+        self.recuento = {}  # para la lista de materiales: piezas y metros de tubo
+
+    def contar(self, clave, cantidad=1):
+        self.recuento[clave] = self.recuento.get(clave, 0) + cantidad
 
     def triangulos(self):
         return self.cuerpo.triangulos() + self.piezas.triangulos()
@@ -198,8 +204,8 @@ def _con_z_arriba(a, anclajes, ruta, ruta_lineal, bajar, cercano, malla_propia, 
             r = Resultado()
             r.hilos = [[_a_interno(p) for p in h] for h in guardada[1]]
             b["_forma"] = forma_a_lista(r, [Anclaje(_a_interno(p)) for p in guardada[0]])
-    anclajes = [Anclaje(_a_interno(x.posicion), _a_interno(x.normal), x.factor, x.longitud, x.desliza)
-                for x in anclajes]
+    anclajes = [Anclaje(_a_interno(x.posicion), _a_interno(x.normal), x.factor, x.longitud, x.desliza,
+                        x.accesorio) for x in anclajes]
     ruta = [_a_interno(p) for p in ruta] if ruta is not None else None
     bajar_i = (lambda x, y, z: bajar(*_a_escena((x, y, z)))) if bajar is not None else None
     cercano_i = None
@@ -333,20 +339,28 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None, ca
             res.cuerpo.anadir(perfiles.cuerpo_cable(h, r, a["perfil_cable"], a["lados"], 1, 0.0))
     else:
         res.cuerpo = perfiles.cuerpo_cable(camino, r, a["perfil_cable"], a["lados"], cantidad, a["torsion"])
+    if res.hilos:
+        res.contar("cable_{:.2f}".format(2.0 * r), sum(vec.longitud_polilinea(h) for h in res.hilos))
+    else:
+        res.contar("cable_{:.2f}".format(2.0 * r), res.longitud * cantidad)
     if not inicio.malla.vacia():
         res.piezas.anadir(inicio.malla, marco_ini)
+        res.contar("conector_" + a["conector_inicio"])
     if not fin.malla.vacia():
         res.piezas.anadir(fin.malla, marco_fin)
+        res.contar("conector_" + a["conector_fin"])
     margen = max(inicio.largo, fin.largo) + a["salida"] + r_total * 4
     if a["pieza"] != "ninguna" and a["separacion_piezas"] > 0:
         modelo = piezas.pieza_cable(a["pieza"], r if res.hilos else r_total)
         for h in (res.hilos or [camino]):
             for p, t, _s in trazado.uniforme(h, a["separacion_piezas"], margen=margen):
                 res.piezas.anadir(modelo, vec.marco_desde_eje(p, t))
+                res.contar("pieza_" + a["pieza"])
     if cantidad > 1 and a["separacion_bridas_haz"] > 0:
         modelo = piezas.brida_haz(r_total)
         for p, t, _s in trazado.uniforme(camino, a["separacion_bridas_haz"], margen=margen):
             res.piezas.anadir(modelo, vec.marco_desde_eje(p, t))
+            res.contar("bridas_haz")
     return res
 
 
@@ -801,8 +815,12 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano, obstaculos=()):
     recorridos = [(c, k) for c, k in recorridos if len(c) >= 2]
     if not recorridos:
         return res
+    con_accesorios = [x for x in anclajes if x.accesorio != "ninguno"] if ruta is None else []
     for camino, codos in recorridos:
-        _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano)
+        if con_accesorios:
+            _vestir_con_accesorios(a, res, camino, codos, R, R_fuera, cercano, anclajes)
+        else:
+            _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano)
     medio = recorridos[len(recorridos) // 2][0]
     res.curva = medio
     res.longitud = vec.longitud_polilinea(medio)
@@ -810,11 +828,124 @@ def _tuberia(a, anclajes, ruta, ruta_lineal, cercano, obstaculos=()):
     return res
 
 
-def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
+def _radio_menor(a, R):
+    """(radio, pared) de la medida siguiente más pequeña, para una reducción."""
+    tabla = MEDIDAS.get(a["norma"])
+    if tabla:
+        menores = [m for m in tabla if m[0] / 2.0 < R * 0.98]
+        if menores:
+            return menores[-1][0] / 2.0, menores[-1][1] if a["pared"] > 0 else 0.0
+    return R * 0.7, a["pared"] * 0.7
+
+
+def _distancia_en(camino, s, p):
+    """Distancia a lo largo de ``camino`` del punto más cercano a ``p``."""
+    mejor, donde = float("inf"), 0.0
+    for i, (u, v) in enumerate(zip(camino, camino[1:])):
+        d = vec.resta(v, u)
+        largo2 = vec.punto(d, d)
+        t = 0.0 if largo2 < 1e-12 else max(0.0, min(1.0, vec.punto(vec.resta(p, u), d) / largo2))
+        q = vec.suma(u, vec.escala(d, t))
+        dist = vec.distancia(q, p)
+        if dist < mejor:
+            mejor, donde = dist, s[i] + t * math.sqrt(largo2)
+    return donde
+
+
+def _tramo(camino, codos, s, d0, d1):
+    """Trozo de ``camino`` entre las distancias ``d0`` y ``d1``, con sus codos."""
+    dentro = [i for i in range(len(camino)) if d0 + 1e-6 < s[i] < d1 - 1e-6]
+    puntos = [trazado.en_distancia(camino, d0)[0]] + [camino[i] for i in dentro] + \
+        [trazado.en_distancia(camino, d1)[0]]
+    desplazar = (dentro[0] - 1) if dentro else 0
+    nuevos = []
+    for c in codos:
+        if s[c.indice_inicio] >= d0 and s[c.indice_fin] <= d1 and dentro:
+            nuevos.append(trazado.Codo(c.inicio, c.fin, c.tangente_inicio, c.tangente_fin,
+                                       c.indice_inicio - desplazar, c.indice_fin - desplazar, c.angulo))
+    return trazado.limpiar_repetidos(puntos), nuevos
+
+
+def _vestir_con_accesorios(a, res, camino, codos, R, R_fuera, cercano, anclajes):
+    """Tubería con válvulas, tes y reducciones en sus anclajes.
+
+    Una reducción en un anclaje intermedio hace que, a partir de ahí, la
+    tubería sea de la medida siguiente más pequeña. En un extremo, deja la
+    salida a esa medida para seguir con otra tubería.
+    """
+    s = vec.acumulada(camino)
+    total = s[-1]
+    factor = R_fuera / R
+    sitios = [(_distancia_en(camino, s, x.posicion), x) for x in anclajes]
+    sitios[0] = (0.0, anclajes[0])
+    sitios[-1] = (total, anclajes[-1])
+    # tramos entre reducciones
+    radios, cortes = [(R, a["pared"])], []
+    for d, x in sorted(sitios[1:-1], key=lambda e: e[0]):
+        if x.accesorio == "reduccion" and 0 < d < total:
+            radios.append(_radio_menor(dict(a, pared=radios[-1][1]), radios[-1][0]))
+            cortes.append(d)
+    largos = [max(radios[k][0] * factor * 1.6, (radios[k][0] - radios[k + 1][0]) * factor * 3.0)
+              for k in range(len(cortes))]
+    inicio = 0.0
+    for k in range(len(radios)):
+        Rk, pared = radios[k]
+        fin = cortes[k] - largos[k] / 2.0 if k < len(cortes) else total
+        if fin - inicio > 1e-3:
+            pts, cods = _tramo(camino, codos, s, inicio, fin)
+            if len(pts) >= 2:
+                ak = dict(a, grosor=2.0 * Rk, pared=pared)
+                quitar = set()
+                if k > 0:
+                    quitar.add("inicio")
+                if k < len(cortes):
+                    quitar.add("fin")
+                if anclajes[0].accesorio == "reduccion" and k == 0:
+                    quitar.add("inicio")
+                if anclajes[-1].accesorio == "reduccion" and k == len(radios) - 1:
+                    quitar.add("fin")
+                _vestir_tuberia(ak, res, pts, cods, Rk, Rk * factor, cercano, sin_extremos=quitar)
+        if k < len(cortes):
+            p, t = trazado.en_distancia(camino, cortes[k])
+            res.piezas.anadir(piezas.reduccion(Rk * factor, radios[k + 1][0] * factor),
+                              vec.marco_desde_eje(p, t))
+            res.contar("reducciones")
+            inicio = cortes[k]
+
+    def radio_en(d):
+        for k, c in enumerate(cortes):
+            if d < c:
+                return radios[k][0]
+        return radios[-1][0]
+
+    for d, x in sitios:
+        if x.accesorio == "ninguno":
+            continue
+        if x.accesorio == "reduccion":
+            if d <= 0.0 or d >= total:  # en un extremo: reducción hacia fuera
+                Rk = radio_en(d)
+                r, _pared = _radio_menor(a, Rk)
+                p, t = trazado.en_distancia(camino, min(max(d, 1e-6), total))
+                fuera = vec.escala(t, -1.0) if d <= 0.0 else t
+                largo = max(Rk * factor * 1.6, (Rk - r) * factor * 3.0)
+                res.piezas.anadir(piezas.reduccion(Rk * factor, r * factor),
+                                  vec.marco_desde_eje(vec.suma(p, vec.escala(fuera, largo / 2.0)), fuera))
+                res.contar("reducciones")
+            continue
+        p, t = trazado.en_distancia(camino, min(max(d, 1e-6), total - 1e-6))
+        res.piezas.anadir(piezas.accesorio(x.accesorio, radio_en(d) * factor),
+                          vec.marco_desde_eje(p, t, x.normal))
+        res.contar({"te": "tes", "valvula_bola": "valvulas_bola",
+                    "valvula_compuerta": "valvulas_compuerta"}.get(x.accesorio, x.accesorio))
+
+
+def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano, sin_extremos=()):
     """Cuerpo y piezas de una tubería ya trazada."""
     abierta = a["extremos"] == "abiertos"
     res.cuerpo.anadir(perfiles.cuerpo_tuberia(camino, R, a["perfil_tuberia"], max(a["lados"], 8), a["pared"],
                                               abierta))
+    res.contar("tubo_{:.2f}".format(2.0 * R), vec.longitud_polilinea(camino))
+    res.contar("codos_{:.2f}".format(2.0 * R), len(codos))
 
     s = vec.acumulada(camino)
     curvas = [(s[c.indice_inicio] - R_fuera * 1.6, s[c.indice_fin] + R_fuera * 1.6) for c in codos]
@@ -828,6 +959,7 @@ def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
         for c in codos:
             res.piezas.anadir(m, vec.marco_desde_eje(c.inicio, c.tangente_inicio))
             res.piezas.anadir(m, vec.marco_desde_eje(c.fin, c.tangente_fin))
+            res.contar("manguitos", 2)
     # Codos soldados: el codo es una pieza algo más gruesa, con un cordón de soldadura a cada lado.
     if a["codo"] == "soldado":
         cordon = piezas.cordon(R_fuera)
@@ -845,12 +977,14 @@ def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
         for p, t, d in trazado.uniforme(camino, a["separacion_bridas"], margen=R_fuera * 2):
             if en_recta(d):
                 res.piezas.anadir(b, vec.marco_desde_eje(p, t))
+                res.contar("bridas")
         hueco = R_fuera * (1.0 if a["codo"] == "pieza" else 0.35)
         for c in codos:
             res.piezas.anadir(b, vec.marco_desde_eje(vec.resta(c.inicio, vec.escala(c.tangente_inicio, hueco)),
                                                      c.tangente_inicio))
             res.piezas.anadir(b, vec.marco_desde_eje(vec.suma(c.fin, vec.escala(c.tangente_fin, hueco)),
                                                      c.tangente_fin))
+            res.contar("bridas", 2)
     # Fajas de la tubería aislada, cada metro.
     if a["perfil_tuberia"] == "aislada":
         f = piezas.faja(R)
@@ -876,14 +1010,19 @@ def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
     # Extremos.
     t0 = vec.unitario(vec.resta(camino[0], camino[1]))
     t1 = vec.unitario(vec.resta(camino[-1], camino[-2]))
+    extremos = [(camino[0], t0)] if "inicio" not in sin_extremos else []
+    if "fin" not in sin_extremos:
+        extremos.append((camino[-1], t1))
     if a["extremos"] == "tapon":
         tp = piezas.tapon(R_fuera)
-        res.piezas.anadir(tp, vec.marco_desde_eje(camino[0], t0))
-        res.piezas.anadir(tp, vec.marco_desde_eje(camino[-1], t1))
+        for p, t in extremos:
+            res.piezas.anadir(tp, vec.marco_desde_eje(p, t))
+            res.contar("tapones")
     elif a["extremos"] == "brida":
         b = piezas.brida_tuberia(R_fuera)
-        res.piezas.anadir(b, vec.marco_desde_eje(vec.suma(camino[0], vec.escala(t0, -R_fuera * 0.18)), t0))
-        res.piezas.anadir(b, vec.marco_desde_eje(vec.suma(camino[-1], vec.escala(t1, -R_fuera * 0.18)), t1))
+        for p, t in extremos:
+            res.piezas.anadir(b, vec.marco_desde_eje(vec.suma(p, vec.escala(t, -R_fuera * 0.18)), t))
+            res.contar("bridas")
     # Soportes a la pared más cercana.
     separacion = separacion_soportes_auto(2.0 * R) if a["soportes_auto"] else a["separacion_soportes"]
     if separacion > 0 and cercano is not None:
@@ -900,4 +1039,5 @@ def _vestir_tuberia(a, res, camino, codos, R, R_fuera, cercano):
             if vec.distancia(p, contacto) > a["alcance_soportes"] + R_fuera:
                 continue
             res.piezas.anadir(piezas.soporte(R_fuera, p, t, contacto, normal))
+            res.contar("soportes")
     return res

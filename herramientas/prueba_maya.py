@@ -253,6 +253,44 @@ def main():
         comprobar(caras(p_tub) + caras(m_tub) > sin_soportes, "soportes a la pared (van en la malla de metal)")
         comprobar(materiales.de(c_tub) == "cobre", "material de la tubería")
 
+        # techo: soportes colgados con varilla (rayo hacia arriba)
+        techo = cmds.polyCube(width=600, height=5, depth=200, name="techo")[0]
+        cmds.move(300, 400, 0, techo)
+        escena.poner_apoyos([nt], [pared, techo])
+        cmds.setAttr(nt + ".soportesHacia", 1)
+        cmds.setAttr(nt + ".alcanceSoportes", 400.0)
+        ys = [p[1] for p in cmds.xform(m_tub + ".vtx[*]", query=True, translation=True, worldSpace=True)[1::3]]
+        comprobar(ys and max(ys) > 395, "soportes colgados del techo ({:.0f})".format(max(ys) if ys else 0))
+        cmds.setAttr(nt + ".soportesHacia", 0)
+        escena.poner_apoyos([nt], [pared])
+        cmds.delete(techo)
+
+        # accesorios, derivación y lista de materiales
+        nueva = escena.insertar_punto(escena.anclas_de(nt)[0])
+        comprobar(escena.poner_accesorio([nueva], "valvula_bola") == 1, "válvula en un anclaje")
+        import json as _json
+        recuento = _json.loads(cmds.getAttr(nt + ".recuento"))
+        comprobar(recuento.get("valvulas_bola") == 1, "la válvula sale en el recuento")
+        destino = cmds.spaceLocator(name="destinoRama")[0]
+        cmds.move(200, 50, 150, destino)
+        rama = escena.derivar(nueva, ((200, 50, 150), (0, 0, -1), destino))
+        nr = escena.nodo_de(rama)
+        comprobar(nr is not None and cmds.getAttr(nueva + ".pipeAccesorio") == 3 and caras(escena.formas_de(nr)[0]) > 50,
+                  "derivación con te")
+        csv_ruta = os.path.join(temporal, "materiales.csv")
+        filas_bom = escena.lista_materiales([nt, nr], csv_ruta)
+        comprobar(os.path.exists(csv_ruta) and any(f["concepto"] == "tes" for f in filas_bom)
+                  and any(f["concepto"] == "tubo" for f in filas_bom), "lista de materiales en CSV")
+        escena.borrar([nt])
+        comprobar(cmds.objExists(nr) and len(escena.anclas_de(nr)) == 2, "borrar la tubería deja viva la rama")
+        escena.borrar([nr])
+        cmds.delete(destino)
+        tub = escena.crear([((0, 50, -37.5), (0, 0, 1), None), ((400, 300, -37.5), (0, 0, 1), None)],
+                           {"tipo": "tuberia", "grosor": 8.0, "separacion_bridas": 100.0, "codo": "pieza",
+                            "separacion_soportes": 80.0, "extremos": "brida"})
+        nt = escena.nodo_de(tub)
+        escena.poner_apoyos([nt], [pared])
+
         # --- desde una curva y desde aristas ---
         curva_usuario = cmds.curve(degree=3, point=[(0, 0, 200), (100, 50, 250), (200, 0, 300), (300, 80, 200)])
         g_curva = escena.crear_desde_curva(curva_usuario, {"tipo": "tuberia", "perfil_tuberia": "corrugada",

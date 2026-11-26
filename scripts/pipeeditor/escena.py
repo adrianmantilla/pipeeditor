@@ -18,12 +18,13 @@ import random
 import maya.api.OpenMaya as om
 from maya import cmds
 
-from pipeeditor import construir, materiales, nodo, vec
+from pipeeditor import construir, materiales, nodo, piezas, vec
 
 ATRIB_GRUPO = "pipeEditorNodo"
 ATRIB_FACTOR = "pipeFactor"
 ATRIB_LONGITUD = "pipeLongitud"
 ATRIB_DESLIZA = "pipeDesliza"
+ATRIB_ACCESORIO = "pipeAccesorio"
 
 
 # --- utilidades -----------------------------------------------------------------------
@@ -155,9 +156,17 @@ def _anadir_desliza(loc):
                      defaultValue=False, keyable=True)
 
 
+def _anadir_accesorio(loc):
+    if not cmds.attributeQuery(ATRIB_ACCESORIO, node=loc, exists=True):
+        cmds.addAttr(loc, longName=ATRIB_ACCESORIO, niceName=_texto("atrib_accesorio"), attributeType="enum",
+                     enumName=":".join(_texto("opcion_accesorio_" + a) for a in piezas.ACCESORIOS),
+                     defaultValue=0, keyable=False)
+        cmds.setAttr(loc + "." + ATRIB_ACCESORIO, channelBox=True)
+
+
 def _reconectar(n, anclas):
     """Conecta ``anclas`` (en orden) a las entradas del nodo, quitando lo anterior."""
-    for atributo in ("anclas", "factores", "longitudes", "deslizan"):
+    for atributo in ("anclas", "factores", "longitudes", "deslizan", "accesorios"):
         for i in cmds.getAttr("{}.{}".format(n, atributo), multiIndices=True) or []:
             plug = "{}.{}[{}]".format(n, atributo, i)
             for f in cmds.listConnections(plug, source=True, destination=False, plugs=True) or []:
@@ -169,6 +178,9 @@ def _reconectar(n, anclas):
         cmds.connectAttr(a + "." + ATRIB_LONGITUD, "{}.longitudes[{}]".format(n, i), force=True)
         _anadir_desliza(a)
         cmds.connectAttr(a + "." + ATRIB_DESLIZA, "{}.deslizan[{}]".format(n, i), force=True)
+        if cmds.attributeQuery("accesorios", node=n, exists=True):
+            _anadir_accesorio(a)
+            cmds.connectAttr(a + "." + ATRIB_ACCESORIO, "{}.accesorios[{}]".format(n, i), force=True)
 
 
 def _crear_estructura(base, ajustes):
@@ -212,6 +224,58 @@ def _con_eje(ajustes):
         except (RuntimeError, AttributeError):
             pass
     return completos
+
+
+def poner_accesorio(anclas, tipo):
+    """Pone una válvula, una te o una reducción (o nada) en los anclajes de tubería elegidos."""
+    hechos = 0
+    with Bloque():
+        for a in anclas:
+            n = nodo_de(a)
+            if not es_ancla(a) or not n or leer_ajustes(n)["tipo"] != "tuberia":
+                continue
+            if not cmds.attributeQuery(ATRIB_ACCESORIO, node=a, exists=True):
+                _reconectar(n, anclas_de(n))
+            cmds.setAttr(a + "." + ATRIB_ACCESORIO, piezas.ACCESORIOS.index(tipo))
+            hechos += 1
+    return hechos
+
+
+def derivar(ancla, destino, ajustes=None, mirar_a_la_te=False):
+    """Te en el anclaje ``ancla`` de una tubería y otra tubería desde ahí hasta ``destino``.
+
+    ``destino`` es un anclaje como los de ``anclajes_de_seleccion``: (posición,
+    normal, objeto o None). La salida de la te mira hacia el destino, en
+    perpendicular a la tubería; la nueva tubería cuelga de ese anclaje, así
+    que se mueve con él.
+    """
+    n = nodo_de(ancla)
+    if not n or leer_ajustes(n)["tipo"] != "tuberia":
+        raise ValueError(_texto("falta_ancla_tuberia"))
+    curva = formas_de(n)[2]
+    p = tuple(cmds.xform(ancla, query=True, translation=True, worldSpace=True))
+    tangente = (1.0, 0.0, 0.0)
+    if curva:
+        fn = om.MFnNurbsCurve(om.MSelectionList().add(curva).getDagPath(0))
+        punto, u = fn.closestPoint(om.MPoint(*p), space=om.MSpace.kWorld)
+        p = (punto.x, punto.y, punto.z)
+        t = fn.tangent(u, om.MSpace.kWorld)
+        tangente = vec.unitario((t.x, t.y, t.z))
+    hacia = vec.resta(destino[0], p)
+    salida = vec.resta(hacia, vec.escala(tangente, vec.punto(hacia, tangente)))
+    salida = vec.unitario(salida, vec.perpendicular(tangente))
+    if mirar_a_la_te:  # un objeto sin cara elegida: la tubería llega de frente desde la te
+        d = vec.resta(p, destino[0])
+        destino = (destino[0], vec.unitario((d[0], 0.0, d[2]), vec.escala(salida, -1.0)), destino[2])
+    base = dict(leer_ajustes(n))
+    base.update(ajustes or {})
+    base.update({"tipo": "tuberia", "tubos": 1, "salida": max(base.get("grosor", 2.0) * 0.9, 1.0)})
+    with Bloque("Derivar"):
+        _anadir_accesorio(ancla)
+        _orientar(ancla, p, salida)
+        cmds.setAttr(ancla + "." + ATRIB_ACCESORIO, piezas.ACCESORIOS.index("te"))
+        grupo = crear([(p, salida, ancla), destino], base, base=grupo_de(n).split("|")[-1] + "_rama")
+    return grupo
 
 
 def alternar_gancho(anclas):
@@ -582,6 +646,7 @@ def hornear(nodos_):
             cuerpo, piezas, curva = formas_de(n)
             metal = forma_de(n, "metal")
             anclas = anclas_de(n)
+            _rescatar_hijas(anclas, nodos_)
             ruta = cmds.listConnections(n + ".ruta", source=True, destination=False) or []
             for forma in (cuerpo, piezas, metal, curva):
                 if forma:
@@ -605,6 +670,25 @@ def hornear(nodos_):
                         cmds.delete(sub)
                 hechos.append(grupo)
     return hechos
+
+
+def lista_materiales(nodos_, ruta=None):
+    """Filas de la lista de materiales de ``nodos_``; con ``ruta``, también la guarda en CSV."""
+    import json
+    import io
+    from pipeeditor import lista_materiales as lm
+    elementos = []
+    for n in nodos_:
+        try:
+            recuento = json.loads(cmds.getAttr(n + ".recuento") or "{}")
+        except ValueError:
+            recuento = {}
+        elementos.append((grupo_de(n).split("|")[-1], leer_ajustes(n), recuento))
+    filas_ = lm.filas(elementos)
+    if ruta:
+        with io.open(ruta, "w", encoding="utf-8-sig", newline="") as f:  # con BOM: Excel lo abre bien
+            f.write(lm.a_csv(filas_))
+    return filas_
 
 
 def guardar_copia_horneada(ruta):
@@ -641,11 +725,27 @@ def guardar_copia_horneada(ruta):
     return len(vivos)
 
 
+def _rescatar_hijas(anclas, quedan_fuera):
+    """Antes de borrar ``anclas``: los anclajes de otras tuberías que cuelgan de
+    ellas (las ramas de una te) pasan al grupo de anclajes de su propia tubería."""
+    for a in anclas:
+        if not cmds.objExists(a):
+            continue
+        for hija in cmds.listRelatives(a, children=True, type="transform", fullPath=True) or []:
+            otro = nodo_de(hija) if es_ancla(hija) else None
+            if otro and otro not in quedan_fuera:
+                grupo = grupo_de(otro)
+                destino = grupo + "|" + grupo.split("|")[-1] + "_anclas"
+                if cmds.objExists(destino):
+                    cmds.parent(hija, destino)
+
+
 def borrar(nodos_):
     with Bloque("Borrar"):
         for n in nodos_:
             grupo = grupo_de(n)
             anclas = anclas_de(n)
+            _rescatar_hijas(anclas, nodos_)
             for a in anclas:
                 if cmds.objExists(a):
                     cmds.delete(a)
