@@ -192,9 +192,7 @@ class ServicioMaya(object):
             cmds.select(cuerpos)
 
     def apoyos(self):
-        nodos = self.seleccion()
-        mallas = [s for s in cmds.ls(selection=True, long=True, type="transform") or []
-                  if not escena.nodo_de(s) and cmds.listRelatives(s, shapes=True, type="mesh")]
+        nodos, mallas = escena.reparto_apoyos(cmds.ls(orderedSelection=True, long=True) or [])
         if not nodos:
             raise ValueError(t("falta_cable_y_objetos"))
         cuantas = escena.poner_apoyos(nodos, mallas)

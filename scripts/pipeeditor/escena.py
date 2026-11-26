@@ -75,9 +75,15 @@ def nodo_de(objeto):
         return None
     if cmds.nodeType(objeto) == nodo.NOMBRE:
         return objeto
+    if es_ancla(objeto):
+        for n in cmds.listConnections(objeto + ".worldMatrix", source=False, destination=True,
+                                      type=nodo.NOMBRE) or []:
+            return n
+    # Mallas, curva y grupo reciben del nodo; un objeto de apoyo o un conector
+    # propio le dan algo al nodo, pero no son suyos.
     candidatos = [objeto] + (cmds.listRelatives(objeto, shapes=True, fullPath=True) or [])
     for c in candidatos:
-        for n in cmds.listConnections(c, source=True, destination=True, type=nodo.NOMBRE) or []:
+        for n in cmds.listConnections(c, source=True, destination=False, type=nodo.NOMBRE) or []:
             return n
     # subiendo por los padres (por ejemplo, el grupo de anclas)
     padre = cmds.listRelatives(objeto, parent=True, fullPath=True)
@@ -551,19 +557,57 @@ def fijar_longitudes(nodos_):
         cmds.setAttr(n + ".modoTension", construir.MODOS_TENSION.index("longitud"))
 
 
+def reparto_apoyos(seleccion):
+    """(cables que se apoyan, mallas de apoyo) a partir de la selección, en orden.
+
+    Los cables y tuberías elegidos antes del primer objeto normal son los que
+    se apoyan; lo que va después (objetos, y también otros cables) son los
+    apoyos. Si solo hay cables, el último es el apoyo de los demás: así un
+    cable se tumba encima de otro.
+    """
+    nodos_, mallas = [], []
+    hay_objeto = False
+    for s in seleccion:
+        if "." in s or not cmds.objectType(s, isAType="transform"):
+            continue
+        n = nodo_de(s)
+        es_malla = bool(cmds.listRelatives(s, shapes=True, type="mesh"))
+        if n and not hay_objeto:
+            if n not in nodos_:
+                nodos_.append(n)
+        elif n:
+            cuerpo = forma_de(n, "cuerpo")
+            if cuerpo:
+                mallas.append(cmds.listRelatives(cuerpo, parent=True, fullPath=True)[0])
+        elif es_malla:
+            hay_objeto = True
+            mallas.append(s)
+    if len(nodos_) > 1 and not mallas:
+        ultimo = nodos_.pop()
+        cuerpo = forma_de(ultimo, "cuerpo")
+        if cuerpo:
+            mallas.append(cmds.listRelatives(cuerpo, parent=True, fullPath=True)[0])
+    return nodos_, mallas
+
+
 def poner_apoyos(nodos_, mallas):
-    """Los cables y tuberías se apoyan en (y se sujetan a) estas mallas."""
+    """Los cables y tuberías se apoyan en (y se sujetan a) estas mallas.
+
+    Una malla que depende del propio cable (otro cable apoyado en él) se salta,
+    para no hacer un ciclo.
+    """
     formas = []
     for m in mallas:
         formas.extend(cmds.listRelatives(m, shapes=True, type="mesh", fullPath=True, noIntermediate=True) or [])
     with Bloque():
         for n in nodos_:
+            propias = [f for f in formas if n not in (cmds.listHistory(f) or [])]
             for i in cmds.getAttr(n + ".apoyos", multiIndices=True) or []:
                 plug = "{}.apoyos[{}]".format(n, i)
                 for f in cmds.listConnections(plug, source=True, destination=False, plugs=True) or []:
                     cmds.disconnectAttr(f, plug)
                 cmds.removeMultiInstance(plug, b=True)
-            for i, f in enumerate(formas):
+            for i, f in enumerate(propias):
                 cmds.connectAttr(f + ".worldMesh[0]", "{}.apoyos[{}]".format(n, i), force=True)
     return len(formas)
 

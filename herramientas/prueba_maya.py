@@ -219,6 +219,23 @@ def main():
                   "fijado: la forma sigue al extremo que se mueve ({:.0f} ms)".format(ms))
         cmds.xform(ancla_fin, worldSpace=True, translation=fin_antes)
         comprobar(escena.alternar_fijado([nl]) is False and not escena.esta_fijado(nl), "soltar la forma")
+        # un cable encima de otro: el de arriba se apoya en la malla del de abajo
+        mesa_n = cmds.ls(mesa2)  # la mesa sigue siendo un objeto normal aunque sea apoyo
+        comprobar(escena.nodo_de(mesa_n[0]) is None, "un objeto de apoyo no se toma por un cable")
+        abajo = escena.crear([((-330, 0.5, 400), (1, 0, 0), None), ((-30, 0.5, 400), (-1, 0, 0), None)],
+                             {"tipo": "cable", "grosor": 6.0, "holgura": 0.02})
+        arriba = escena.crear([((-180, 30, 330), (0, -1, 0), None), ((-180, 30, 470), (0, -1, 0), None)],
+                              {"tipo": "cable", "grosor": 1.0, "holgura": 0.5})
+        na, nb = escena.nodo_de(arriba), escena.nodo_de(abajo)
+        nodos_ap, mallas_ap = escena.reparto_apoyos(cmds.ls([arriba, abajo], long=True))
+        comprobar(nodos_ap == [na] and len(mallas_ap) == 1, "seleccionar dos cables: el último es el apoyo")
+        escena.poner_apoyos(nodos_ap, mallas_ap)
+        pa = puntos_curva(escena.formas_de(na)[2], 100)
+        medio = min(pa, key=lambda p: abs(p[2] - 400))
+        comprobar(medio[1] > 5.5, "el cable de arriba queda encima del de abajo ({:.1f})".format(medio[1]))
+        escena.poner_apoyos([nb], [cmds.listRelatives(escena.formas_de(na)[0], parent=True)[0]])
+        comprobar(not cmds.listConnections(nb + ".apoyos"), "sin ciclos: el de abajo no se apoya en el de arriba")
+        escena.borrar([na, nb])
         cmds.delete(lamp, mesa2, enchufe)
 
         # puntos intermedios
