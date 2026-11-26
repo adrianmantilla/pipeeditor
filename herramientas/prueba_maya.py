@@ -224,14 +224,19 @@ def main():
         comprobar(escena.nodo_de(mesa_n[0]) is None, "un objeto de apoyo no se toma por un cable")
         abajo = escena.crear([((-330, 0.5, 400), (1, 0, 0), None), ((-30, 0.5, 400), (-1, 0, 0), None)],
                              {"tipo": "cable", "grosor": 6.0, "holgura": 0.02})
-        arriba = escena.crear([((-180, 30, 330), (0, -1, 0), None), ((-180, 30, 470), (0, -1, 0), None)],
+        # tumbado, el de abajo se ondula de lado: se cruza por donde está de verdad en x = -180
+        vb = cmds.xform(escena.formas_de(escena.nodo_de(abajo))[0] + ".vtx[*]", query=True, translation=True,
+                        worldSpace=True)
+        zs = [vb[i + 2] for i in range(0, len(vb), 3) if abs(vb[i] + 180) < 3]
+        zc = (min(zs) + max(zs)) / 2.0
+        arriba = escena.crear([((-180, 30, zc - 70), (0, -1, 0), None), ((-180, 30, zc + 70), (0, -1, 0), None)],
                               {"tipo": "cable", "grosor": 1.0, "holgura": 0.5})
         na, nb = escena.nodo_de(arriba), escena.nodo_de(abajo)
         nodos_ap, mallas_ap = escena.reparto_apoyos(cmds.ls([arriba, abajo], long=True))
         comprobar(nodos_ap == [na] and len(mallas_ap) == 1, "seleccionar dos cables: el último es el apoyo")
         escena.poner_apoyos(nodos_ap, mallas_ap)
         pa = puntos_curva(escena.formas_de(na)[2], 100)
-        medio = min(pa, key=lambda p: abs(p[2] - 400))
+        medio = min(pa, key=lambda p: abs(p[2] - zc))
         comprobar(medio[1] > 5.5, "el cable de arriba queda encima del de abajo ({:.1f})".format(medio[1]))
         escena.poner_apoyos([nb], [cmds.listRelatives(escena.formas_de(na)[0], parent=True)[0]])
         comprobar(not cmds.listConnections(nb + ".apoyos"), "sin ciclos: el de abajo no se apoya en el de arriba")
@@ -387,8 +392,11 @@ def main():
                                     "material_metal": "luz_calida"})
             nl = escena.nodo_de(g_luces)
             luz = escena.luz_de(nl)
-            comprobar(bool(luz) and cmds.nodeType(luz) == "aiMeshLight"
-                      and not cmds.getAttr(luz + ".lightVisible"), "las bombillas alumbran (luz de malla)")
+            exposicion = next((cmds.getAttr(luz + "." + a) for a in ("aiExposure", "exposure")
+                               if luz and cmds.attributeQuery(a, node=luz, exists=True)), 0.0)
+            comprobar(bool(luz) and cmds.nodeType(luz) == "aiMeshLight" and exposicion > 5
+                      and not cmds.getAttr(luz + ".lightVisible"),
+                      "las bombillas alumbran (luz de malla, exposición {:.0f})".format(exposicion))
             escena.poner_material([nl], "metal", "laton")
             comprobar(escena.luz_de(nl) is None, "sin «Luz cálida», no hay luz")
             escena.poner_material([nl], "metal", "luz_calida")

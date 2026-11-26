@@ -249,6 +249,7 @@
   "cmd_copia_horneada": "PipeEditor: guardar una copia de la escena con todo horneado, para render en otro ordenador",
   "copia_horneada_hecha": "Copia horneada guardada ({n} cables o tuberías): {ruta}",
   "copia_no_deshecha": "No se pudo dejar la escena como estaba tras guardar la copia. Usa Editar > Deshacer.",
+  "exportar_no_deshecho": "No se pudo dejar la escena como estaba tras exportar. Usa Editar > Deshacer.",
   "menu_idioma": "Idioma (Language)",
   "idioma_es": "Español",
   "idioma_en": "English",

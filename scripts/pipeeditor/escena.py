@@ -611,8 +611,10 @@ def luz_de_bombillas(n):
     cmds.setAttr(t + ".inheritsTransform", 0)
     luz = cmds.createNode("aiMeshLight", name=base + "_luzShape", parent=t)
     cmds.connectAttr(metal + ".outMesh", luz + ".inMesh", force=True)
-    valores = (("color", color), ("intensity", 1.0), ("exposure", 9.0 + (intensidad - 1.0) * 2.0),
-               ("aiNormalize", False), ("lightVisible", False), ("showOriginalMesh", True), ("aiSamples", 2))
+    exposicion = 9.0 + (intensidad - 1.0) * 2.0
+    valores = (("color", color), ("intensity", 1.0), ("aiExposure", exposicion), ("exposure", exposicion),
+               ("aiNormalize", False), ("normalize", False), ("lightVisible", False), ("showOriginalMesh", True),
+               ("aiSamples", 2), ("samples", 2))
     for atributo, v in valores:
         if not cmds.attributeQuery(atributo, node=luz, exists=True):
             continue
@@ -875,15 +877,17 @@ def exportar_horneado(nodos_, ruta):
     if not deshacer:
         cmds.undoInfo(state=True)
     try:
+        vivos = len(nodos())
+        # La selección va dentro del bloque: si no, el deshacer quitaría solo la selección.
         with Bloque("Exportar horneado"):
             grupos = hornear(nodos_)
-        try:
             cmds.select(grupos, replace=True)
+        try:
             if extension == ".fbx":
                 cmds.file(ruta, exportSelected=True, type="FBX export", force=True)
             elif extension == ".obj":
                 cmds.file(ruta, exportSelected=True, type="OBJexport", force=True,
-                          options="groups=1;ptgroups=1;materials=1;smoothing=1;normals=1")
+                          options="groups=1;ptgroups=1;materials=0;smoothing=1;normals=1")
             else:
                 cmds.mayaUSDExport(file=ruta, selection=True, exportUVs=True, shadingMode="useRegistry")
         finally:
@@ -891,7 +895,10 @@ def exportar_horneado(nodos_, ruta):
     finally:
         if not deshacer:
             cmds.undoInfo(state=False)
+        seleccion = [s_ for s_ in seleccion if cmds.objExists(s_)]
         cmds.select(seleccion, replace=True) if seleccion else cmds.select(clear=True)
+    if len(nodos()) != vivos:
+        raise RuntimeError(_texto("exportar_no_deshecho"))
     return len(grupos)
 
 

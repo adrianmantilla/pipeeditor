@@ -249,6 +249,7 @@
   "cmd_copia_horneada": "PipeEditor: save a copy of the scene with everything baked, for rendering on another computer",
   "copia_horneada_hecha": "Baked copy saved ({n} cables or pipes): {ruta}",
   "copia_no_deshecha": "Couldn't restore the scene after saving the copy. Use Edit > Undo.",
+  "exportar_no_deshecho": "Couldn't restore the scene after exporting. Use Edit > Undo.",
   "menu_idioma": "Language (Idioma)",
   "idioma_es": "Español",
   "idioma_en": "English",
