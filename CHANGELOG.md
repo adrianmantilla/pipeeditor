@@ -2,6 +2,23 @@
 
 Las escenas guardadas con una versión anterior se abren igual que se hicieron: PipeEditor guarda en cada nodo la versión de sus datos y, al abrir, mantiene los valores con los que se crearon.
 
+## 1.4.0
+
+### Cables
+- **Viento**: los cables que cuelgan libres se balancean con ráfagas que siguen el tiempo de la escena (para animar). Fuerza, ráfagas por segundo y dirección. Sin viento, el cable no se recalcula en cada fotograma.
+- **Un cable encima de otro**: selecciona el cable y después el otro cable (o varios objetos y cables) y pulsa *Apoyar en los objetos seleccionados*. No se pueden hacer ciclos.
+- **Cadena**: perfil de eslabones a tamaño real, cada uno girado 90° respecto al anterior.
+- **Guirnalda de luces**: pieza *Bombilla* con portalámparas y material *Luz cálida*, que ilumina en Arnold.
+- **Rollo**: conector con el cable que sobra enrollado en el suelo, con el perfil del cable.
+- **Render como curva** (Arnold): para escenas con cientos de cables; se ocultan las mallas y Arnold renderiza la curva con su grosor y material.
+- Estilos de serie nuevos: *Guirnalda de luces* y *Cadena*.
+
+### Tuberías
+- **Bandeja portacables**: perfil en U abierto hacia arriba.
+
+### Exportar
+- **PipeEditor > Exportar horneado (USD, FBX u OBJ)…**: exporta lo seleccionado, o toda la escena, como mallas normales. La escena abierta no cambia.
+
 ## 1.3.0
 
 ### Tuberías de instalación

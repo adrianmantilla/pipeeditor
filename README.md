@@ -22,8 +22,11 @@ Para desinstalar, borra `pipeeditor.mod` de la carpeta `modules` de tus preferen
 - **Ganchos**: puntos por los que el cable pasa deslizando, sin atarse.
 - **Dos modos de tensión**: *holgura fija* (siempre cuelga en proporción; para decorar escenas) y *longitud fija* (guarda la longitud y se tensa al separar los extremos; para animar).
 - **Salida recta**: el cable sale perpendicular a la superficie antes de colgar, como de un enchufe.
-- **Conectores** en cada extremo: clavija, jack, terminal, gancho, grillete, aislador o cualquier objeto tuyo.
-- **Perfiles**: redondo, doble (cable de lámpara en ocho), plano (cinta), trenzado (cuerda de tres cabos), corrugado (manguera) y espiral (teléfono).
+- **Conectores** en cada extremo: clavija, jack, terminal, gancho, grillete, aislador, rollo o cualquier objeto tuyo.
+- **Perfiles**: redondo, doble (cable de lámpara en ocho), plano (cinta), trenzado (cuerda de tres cabos), corrugado (manguera), espiral (teléfono) y cadena.
+- **Viento**: balanceo animado de los cables que cuelgan, con ráfagas y dirección.
+- **Un cable encima de otro**: cualquier cable puede ser apoyo de otro.
+- **Guirnaldas de luces** con bombillas que iluminan en Arnold, y **rollos** del cable que sobra.
 - **Haz de cables**: varios cables juntos, retorcidos y con bridas de plástico, o sueltos (sin bridas), cada uno colgando por su cuenta sin atravesar a los demás.
 - **Piezas a lo largo**: bridas, anillos o etiquetas cada cierta distancia.
 - **Entre dos grupos**: muchos cables de golpe entre las caras de dos objetos, con holgura y grosor algo distintos.
@@ -37,7 +40,7 @@ Para desinstalar, borra `pipeeditor.mod` de la carpeta `modules` de tus preferen
 - **Codos** curvados (radio largo de 1,5 diámetros por defecto), con pieza de unión o soldados con cordón.
 - **Bridas** repartidas en los tramos rectos y a los dos lados de cada codo.
 - **Soportes a la pared**: abrazadera, varilla y placa hasta la superficie más cercana, a la separación que toca por el diámetro.
-- **Perfiles**: redonda, cuadrada (conducto), corrugada (flexible) y aislada. Pared visible en los extremos abiertos; también tapón o brida.
+- **Perfiles**: redonda, cuadrada (conducto), corrugada (flexible), aislada y bandeja portacables. Pared visible en los extremos abiertos; también tapón o brida.
 - **Accesorios**: válvulas de bola y de compuerta, tes con derivación y reducciones en cualquier anclaje.
 - **Pendiente** para desagües, **soportes** a la pared, colgados del techo o apoyados en el suelo, y **señales** (flechas de sentido y bandas de color).
 - **Más normas**: PVC a presión y de desagüe, multicapa y acero ANSI.
@@ -46,12 +49,14 @@ Para desinstalar, borra `pipeeditor.mod` de la carpeta `modules` de tus preferen
 ### Para los dos
 - Todo sigue **vivo**: los extremos son localizadores amarillos; muévelos, anímalos o mueve el objeto al que están pegados y el cable se recalcula.
 - La ventana edita lo seleccionado al momento. También hay una pestaña en el **Editor de atributos**.
-- **Mis estilos**: guarda combinaciones de ajustes. Vienen diez de serie (cable de lámpara, tendido eléctrico, cuerda de puerto, manguera, mazo de cables, teléfono antiguo, fontanería de cobre, tubería industrial, conducto de ventilación, tubo flexible).
-- **Materiales** para Arnold (OpenPBR en Maya 2026 y 2027): goma, PVC, nailon, cáñamo, cobre, acero, galvanizado, óxido, hierro pintado, aluminio...
+- **Mis estilos**: guarda combinaciones de ajustes. Vienen doce de serie (cable de lámpara, tendido eléctrico, cuerda de puerto, manguera, mazo de cables, teléfono antiguo, guirnalda de luces, cadena, fontanería de cobre, tubería industrial, conducto de ventilación, tubo flexible).
+- **Materiales** para Arnold (OpenPBR en Maya 2026 y 2027): goma, PVC, nailon, cáñamo, cobre, acero, galvanizado, óxido, hierro pintado, aluminio, latón y luz cálida (bombillas)...
 - **Mallas limpias**: cerradas, con aristas duras y pliegue para subdividir; el metal va en su propia malla y material.
 - **UV a escala real** (1 unidad = 10 cm): una textura tileable se repite igual en todos los cables.
 - **Asentar y fijar**: guarda la forma de un cable y deja de calcularla (escenas grandes, animación de otros objetos). Si mueves un extremo, la forma se estira hasta él.
 - **Hornear**: convierte en mallas normales de Maya. Al guardar, PipeEditor avisa si quedan cables vivos, porque una escena con cables vivos necesita PipeEditor para abrirse bien.
+- **Render como curva** de Arnold para escenas con cientos de cables.
+- **Exportar horneado** a USD, FBX u OBJ sin tocar la escena.
 - **Copia horneada para render**: guarda una copia con todo horneado para una granja u otro ordenador sin PipeEditor, sin tocar la escena abierta.
 
 ## Formas de crear
@@ -63,6 +68,8 @@ Para desinstalar, borra `pipeeditor.mod` de la carpeta `modules` de tus preferen
 | Entre dos grupos (cables) | Caras o vértices de dos objetos: un cable por pareja. |
 | Desde aristas | Una fila de aristas seguidas de un modelo. |
 | Desde una curva | Una o varias curvas NURBS. |
+
+En el menú **PipeEditor** también están: hornear, guardar una copia horneada, la lista de materiales (CSV), exportar horneado (USD, FBX u OBJ) y el idioma.
 
 Las mismas órdenes están en **Windows → Settings/Preferences → Hotkey Editor → Custom Scripts → PipeEditor** para ponerles un atajo.
 
@@ -82,6 +89,7 @@ plug-ins/pipeeditor_plugin.py    registra el nodo y el menú
 scripts/pipeeditor/
   catenaria.py  trazado.py  apoyo.py      matemática (sin Maya)
   reposo.py                               reposo físico (numpy)
+  lista_materiales.py                     lista de materiales en CSV (sin Maya)
   malla.py  perfiles.py  piezas.py        mallas (sin Maya)
   construir.py                            de ajustes a malla (sin Maya)
   nodo.py                                 nodo pipeEditorNodo (en vivo)
