@@ -492,6 +492,21 @@ def poner_ajustes(nodos_, ajustes):
             if cmds.getAttr(plug, lock=True) or cmds.listConnections(plug, source=True, destination=False):
                 continue
             cmds.setAttr(plug, v)
+        _conectar_tiempo(n)
+
+
+def _conectar_tiempo(n):
+    """Con viento, el nodo lee el tiempo de la escena; sin viento, no (no se recalcula en cada fotograma)."""
+    if not cmds.attributeQuery("tiempo", node=n, exists=True):
+        return
+    plug = n + ".tiempo"
+    fuentes = cmds.listConnections(plug, source=True, destination=False, plugs=True) or []
+    if cmds.getAttr(n + ".viento") > 0 or cmds.listConnections(n + ".viento", source=True, destination=False):
+        if not fuentes:
+            cmds.connectAttr("time1.outTime", plug, force=True)
+    else:
+        for f in fuentes:
+            cmds.disconnectAttr(f, plug)
 
 
 def migrar_escena():

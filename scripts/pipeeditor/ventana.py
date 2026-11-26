@@ -342,6 +342,9 @@ class VentanaPipeEditor(QtWidgets.QWidget):
         activo("alcance_soportes", hay_soportes)
         activo("soportes_hacia", hay_soportes)
         activo("separacion_senales", self.valor("senales") != "ninguna")
+        hay_viento = self.valor("viento") > 0
+        activo("rafagas", hay_viento)
+        activo("direccion_viento", hay_viento)
         reposo = self.valor("reposo")
         for clave in ("rigidez", "ondulacion", "semilla"):
             activo(clave, reposo)

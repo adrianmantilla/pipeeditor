@@ -62,6 +62,9 @@ NUMEROS = [
     ("alcanceSoportes", "alcance_soportes", "d", 1.0, 1000.0),
     ("pendiente", "pendiente", "d", 0.0, 0.1),
     ("separacionSenales", "separacion_senales", "d", 1.0, 2000.0),
+    ("viento", "viento", "d", 0.0, 1.0),
+    ("rafagas", "rafagas", "d", 0.0, 3.0),
+    ("direccionViento", "direccion_viento", "d", None, 360.0),
 ]
 CLAVE_DE_ENUM = {
     "tipo": "tipo", "perfilCable": "perfil_cable", "modoTension": "modo_tension",
@@ -122,6 +125,10 @@ class PipeEditorNodo(om.MPxNode):
         A["deslizan"] = num.create("deslizan", "des", om.MFnNumericData.kBoolean, False)
         num.array = True
         num.usesArrayDataBuilder = True
+        uni = om.MFnUnitAttribute()
+        A["tiempo"] = uni.create("tiempo", "tie", om.MFnUnitAttribute.kTime, 0.0)
+        uni.keyable = False
+        uni.hidden = True
         A["accesorios"] = num.create("accesorios", "acc", om.MFnNumericData.kInt, 0)
         num.array = True
         num.usesArrayDataBuilder = True
@@ -276,6 +283,8 @@ class PipeEditorNodo(om.MPxNode):
         if borrador:
             ajustes["_borrador"] = True
             self._vigilar_al_soltar()
+        if ajustes["viento"] > 0:
+            ajustes["_tiempo"] = datos.inputValue(A["tiempo"]).asTime().asUnits(om.MTime.kSeconds)
         ruta, lineal = _ruta(datos.inputValue(A["ruta"]), ajustes["segmentos_metro"])
         apoyos = []
         arr = datos.inputArrayValue(A["apoyos"])

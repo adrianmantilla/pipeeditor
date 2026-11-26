@@ -95,6 +95,10 @@ POR_DEFECTO = {
     "pendiente": 0.0,            # caída de los tramos horizontales (0,02 = 2 %), hacia el último anclaje
     "senales": "ninguna",        # flechas de sentido o bandas de color a lo largo
     "separacion_senales": 300.0,
+    # viento (cables que cuelgan libres; necesita el tiempo de la escena)
+    "viento": 0.0,               # 0 = quieto, 1 = vendaval
+    "rafagas": 0.5,              # vaivenes por segundo
+    "direccion_viento": 0.0,     # grados, en el plano del suelo (0 = hacia +X)
 }
 
 
@@ -253,7 +257,7 @@ def _segmentos(longitud, a):
 _NO_CAMBIAN_RECORRIDO = ("lados", "perfil_cable", "torsion", "pieza", "separacion_piezas", "segmentos_metro",
                          "perfil_tuberia", "pared", "extremos", "separacion_bridas", "separacion_soportes",
                          "soportes_auto", "alcance_soportes", "codo", "norma", "tubos", "separacion_tubos",
-                         "radio_codo", "recorrido")
+                         "radio_codo", "recorrido", "viento", "rafagas", "direccion_viento", "_tiempo")
 
 
 def _clave(a, anclajes, cache):
@@ -325,6 +329,11 @@ def _cable(a, anclajes, ruta, ruta_lineal, bajar, malla_propia, empujar=None, ca
     else:
         return res
 
+    if a["viento"] > 0 and not res.reposado and len(anclajes) >= 2 and ruta is None:
+        camino = con_viento(camino, anclajes, a["viento"], a["rafagas"], a["direccion_viento"],
+                            a.get("_tiempo", 0.0), a["semilla"])
+        res.hilos = [con_viento(h, anclajes, a["viento"], a["rafagas"], a["direccion_viento"],
+                                a.get("_tiempo", 0.0), a["semilla"] + k) for k, h in enumerate(res.hilos)]
     # Anillos según la curvatura: densos en las curvas, pocos en las rectas.
     paso_max = 100.0 / max(1, a["segmentos_metro"])
     paso_min = min(r * 0.3, paso_max)
@@ -443,6 +452,49 @@ def deformar_forma(forma, anclajes):
             d = vec.mezcla(movidos[tramo], movidos[tramo + 1], u)
             nuevo.append(vec.suma(p, d))
         salida.append(nuevo)
+    return salida
+
+
+def con_viento(camino, anclajes, fuerza, rafagas, direccion, tiempo, semilla=0):
+    """El cable que cuelga, girado alrededor de la cuerda de cada tramo como lo mueve el viento.
+
+    Girar la caída alrededor de la recta entre los dos anclajes conserva la
+    longitud: el cable se balancea hacia un lado sin estirarse. El ángulo
+    cambia con el tiempo (ráfagas) y es mayor cuanto más de lado le da el
+    viento. ``direccion`` en grados, en el suelo; ``tiempo`` en segundos.
+    """
+    if fuerza <= 0 or len(camino) < 3:
+        return camino
+    alfa = math.radians(direccion)
+    W = (math.cos(alfa), 0.0, math.sin(alfa))
+    abajo = (0.0, -1.0, 0.0)
+    cortes = [0]
+    for x in anclajes[1:-1]:
+        j = min(range(len(camino)), key=lambda j: vec.distancia(camino[j], x.posicion))
+        if cortes[-1] < j < len(camino) - 1:
+            cortes.append(j)
+    cortes.append(len(camino) - 1)
+    salida = list(camino)
+    w = 2.0 * math.pi * max(rafagas, 0.0)
+    for k, (i0, i1) in enumerate(zip(cortes, cortes[1:])):
+        a, b = camino[i0], camino[i1]
+        d = vec.unitario(vec.resta(b, a))
+        lado = vec.cruz(d, abajo)
+        if vec.largo(lado) < 1e-6:
+            continue  # tramo vertical: el viento no lo balancea
+        lado = vec.unitario(lado)
+        de_lado = vec.punto(lado, W)
+        fase = semilla * 1.37 + k * 1.7
+        rafaga = 0.55 + 0.3 * math.sin(w * tiempo + fase) + 0.15 * math.sin(2.3 * w * tiempo + 2.0 * fase)
+        angulo = fuerza * abs(de_lado) * rafaga * math.radians(60.0)
+        if de_lado < 0:
+            angulo = -angulo
+        for i in range(i0 + 1, i1):
+            p = camino[i]
+            u = vec.resta(p, a)
+            sobre = vec.escala(d, vec.punto(u, d))
+            v = vec.resta(u, sobre)
+            salida[i] = vec.suma(vec.suma(a, sobre), vec.girar(v, d, angulo))
     return salida
 
 

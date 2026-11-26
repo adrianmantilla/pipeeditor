@@ -322,5 +322,11 @@
   "bom_conector": "Conector: {tipo}",
   "menu_lista_materiales": "Lista de materiales (CSV)…",
   "cmd_lista_materiales": "PipeEditor: guardar la lista de materiales de los seleccionados (o de toda la escena) en un CSV",
-  "lista_materiales_hecha": "Lista de materiales guardada ({n} filas): {ruta}"
+  "lista_materiales_hecha": "Lista de materiales guardada ({n} filas): {ruta}",
+  "campo_viento": "Viento",
+  "campo_viento_ayuda": "Balancea los cables que cuelgan libres, con ráfagas que cambian con el tiempo de la escena (para animar). Los que están apoyados o fijados no se mueven.",
+  "campo_rafagas": "Ráfagas",
+  "campo_rafagas_ayuda": "Cuántos vaivenes por segundo.",
+  "campo_direccion_viento": "Dirección del viento",
+  "campo_direccion_viento_ayuda": "Hacia dónde sopla, en grados sobre el suelo (0 = hacia +X). Un cable que va en la misma dirección que el viento apenas se mueve."
 }

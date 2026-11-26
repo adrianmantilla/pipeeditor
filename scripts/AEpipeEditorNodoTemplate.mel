@@ -27,6 +27,16 @@ global proc AEpipeEditorNodoTemplate(string $nodo)
         editorTemplate -label (pipeEditorTexto("campo_apoyar_suelo")) -addControl "apoyarSuelo";
         editorTemplate -label (pipeEditorTexto("campo_altura_suelo")) -addControl "alturaSuelo";
     editorTemplate -endLayout;
+    editorTemplate -beginLayout (pipeEditorTexto("seccion_reposo")) -collapse 0;
+        editorTemplate -label (pipeEditorTexto("campo_reposo")) -addControl "reposo";
+        editorTemplate -label (pipeEditorTexto("campo_rigidez")) -addControl "rigidez";
+        editorTemplate -label (pipeEditorTexto("campo_ondulacion")) -addControl "ondulacion";
+        editorTemplate -label (pipeEditorTexto("campo_variacion")) -addControl "variacion";
+        editorTemplate -label (pipeEditorTexto("campo_semilla")) -addControl "semilla";
+        editorTemplate -label (pipeEditorTexto("campo_viento")) -addControl "viento";
+        editorTemplate -label (pipeEditorTexto("campo_rafagas")) -addControl "rafagas";
+        editorTemplate -label (pipeEditorTexto("campo_direccion_viento")) -addControl "direccionViento";
+    editorTemplate -endLayout;
     editorTemplate -beginLayout (pipeEditorTexto("seccion_recorrido")) -collapse 0;
         editorTemplate -label (pipeEditorTexto("campo_recorrido")) -addControl "recorrido";
         editorTemplate -label (pipeEditorTexto("campo_pendiente")) -addControl "pendiente";
@@ -63,6 +73,9 @@ global proc AEpipeEditorNodoTemplate(string $nodo)
     editorTemplate -suppress "formaFijada";
     editorTemplate -suppress "forma";
     editorTemplate -suppress "refinar";
+    editorTemplate -suppress "tiempo";
+    editorTemplate -suppress "recuento";
+    editorTemplate -suppress "accesorios";
     editorTemplate -suppress "factores";
     editorTemplate -suppress "longitudes";
     editorTemplate -suppress "ruta";

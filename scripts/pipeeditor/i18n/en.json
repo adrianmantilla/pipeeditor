@@ -322,5 +322,11 @@
   "bom_conector": "Connector: {tipo}",
   "menu_lista_materiales": "Bill of materials (CSV)…",
   "cmd_lista_materiales": "PipeEditor: save the bill of materials of the selection (or the whole scene) as CSV",
-  "lista_materiales_hecha": "Bill of materials saved ({n} rows): {ruta}"
+  "lista_materiales_hecha": "Bill of materials saved ({n} rows): {ruta}",
+  "campo_viento": "Wind",
+  "campo_viento_ayuda": "Sways freely hanging cables, with gusts that change with scene time (for animation). Resting or frozen cables don't move.",
+  "campo_rafagas": "Gusts",
+  "campo_rafagas_ayuda": "How many swings per second.",
+  "campo_direccion_viento": "Wind direction",
+  "campo_direccion_viento_ayuda": "Where it blows, in degrees on the ground (0 = towards +X). A cable running along the wind barely moves."
 }
